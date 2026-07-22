@@ -161,7 +161,7 @@ def mission_log(watcher_id: int, limit: int = 50, db: Session = Depends(get_db))
         db.query(Run)
         .filter(Run.watcher_id == watcher_id)
         .order_by(Run.id.desc())
-        .limit(min(limit, 200))
+        .limit(max(1, min(limit, 200)))
         .all()
     )
 

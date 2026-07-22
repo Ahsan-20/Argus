@@ -12,13 +12,13 @@ doing its job.
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .fetcher import UnsafeUrlError, fetch_readable_text
+from .fetcher import MIN_USEFUL_CHARS, UnsafeUrlError, fetch_readable_text
 from .llm import complete_json
 from .models import Event, Run, Watcher
 from .prompts import WATCHER_PROMPT, WATCHER_SCHEMA
@@ -31,11 +31,9 @@ logger = logging.getLogger("argus.tick")
 # false alarm on its own.
 TRIGGER_CONFIDENCE = 70
 
-# Some sites (JS-rendered storefronts, infinite-scroll feeds) return a scrap of
-# navigation chrome instead of content. Judging a condition against 150 chars of
-# menu text produces a confident-sounding but meaningless verdict, so anything
-# below this is reported as an unusable page rather than pretended to be a read.
-MIN_USEFUL_CHARS = 200
+# MIN_USEFUL_CHARS comes from the fetcher: pages below it are reported as
+# unusable rather than judged, because a verdict formed from a scrap of
+# navigation chrome sounds confident while meaning nothing.
 
 
 def claim_due_watchers(db: Session) -> list[int]:
@@ -43,8 +41,27 @@ def claim_due_watchers(db: Session) -> list[int]:
 
     Bumps next_run_at forward in the same statement that selects them, so a
     second concurrent tick sees them as not-yet-due. Returns claimed ids.
+
+    The atomic UPDATE ... RETURNING with SKIP LOCKED is Postgres-only. The
+    SQLite dev fallback gets a plain read-then-update: single process, no
+    concurrent cron, so the race the Postgres path defends against cannot
+    happen there.
     """
     now = datetime.now(timezone.utc)
+
+    if db.get_bind().dialect.name != "postgresql":
+        due = (
+            db.query(Watcher)
+            .filter(Watcher.status == "active", Watcher.next_run_at <= now)
+            .order_by(Watcher.next_run_at)
+            .limit(settings.max_runs_per_tick)
+            .all()
+        )
+        for w in due:
+            w.next_run_at = now + timedelta(minutes=w.cadence_minutes)
+        db.commit()
+        return [w.id for w in due]
+
     rows = db.execute(
         text(
             """
@@ -115,7 +132,14 @@ def execute_watcher(db: Session, watcher: Watcher) -> Run:
             # compare against.
             watcher.last_snapshot = run.page_summary
 
-            if run.verdict_met and run.confidence >= TRIGGER_CONFIDENCE:
+            # Only an active probe can fire. Without this, run-now on an
+            # already-triggered probe would emit duplicate trigger events
+            # (and, from day 3, duplicate alert emails).
+            if (
+                run.verdict_met
+                and run.confidence >= TRIGGER_CONFIDENCE
+                and watcher.status == "active"
+            ):
                 _trigger(db, watcher, run)
 
     except UnsafeUrlError as exc:

@@ -14,7 +14,7 @@ Frontend lives in a separate repository.
 
 ## Status
 
-**Day 2 of 6 complete (2026-07-22). Probes now run, judge, and report.**
+**Day 2 of 6 complete and hardened (2026-07-23). Probes run, judge, report.**
 
 Working:
 - FastAPI app on Supabase Postgres, tables auto-create on startup
@@ -168,12 +168,32 @@ Hard-won during setup. Do not re-learn these the hard way.
   foreign key violation.
 - **Callsigns come from `max(id)`, not row count**, so retiring a probe never
   causes a later one to reuse an existing callsign.
-- **Real-world fetch success is about 70 percent**, measured 2026-07-22 across
-  10 varied sites. Working: Wikipedia, Hacker News, GitHub releases,
-  python.org, BBC News, Ticketmaster, gov.uk. Returning too little text to
-  judge: Reddit, Amazon, Booking.com, all JavaScript rendered. This is better
-  than feared and the useful targets mostly work, but the README should stay
-  honest that JS-heavy storefronts are out of reach.
+- **Real-world fetch success is about 70 percent direct, higher with the
+  fallback.** Measured 2026-07-22 across 10 varied sites: Wikipedia, Hacker
+  News, GitHub releases, python.org, BBC News, Ticketmaster and gov.uk work;
+  Reddit, Amazon and Booking.com are JS rendered and out of reach. The
+  README should stay honest that JS-heavy storefronts mostly do not work.
+- **Pakistani gov and university sites: 10 of 11 usable** (2026-07-23).
+  FBR, pakistan.gov.pk, HEC, PPSC jobs, NUST, LUMS, Punjab University, UET,
+  COMSATS all read directly. Two need the TLS-verify retry (pakistan.gov.pk,
+  HEC have broken cert chains). NADRA blocks bots with a 403 but is rescued
+  by the rendering fallback (6k chars of real content). Only NTS stays
+  unreadable. PPSC's jobs page is a strong real demo use case.
+- **The fetch escalation chain** mirrors the LLM client: direct fetch, then
+  a TLS-unverified retry (only on certificate errors, logged), then the
+  r.jina.ai rendering proxy (free, keyless, ~20 req/min). The proxy is
+  strictly a fallback: it rescued NADRA but returns block pages or nothing
+  for Reddit/Amazon/NTS, so it cannot be trusted as a primary.
+- **Redirects are followed manually and every hop is re-validated.** An
+  auto-following client is an SSRF hole: a public URL that 302s to
+  127.0.0.1 or the cloud metadata IP would sail past a create-time check.
+  Verified live against httpbin redirect attacks.
+- **The byte cap must be enforced while streaming.** Slicing resp.text after
+  the download means the whole body was already in memory; a huge page could
+  take down the 512 MB Koyeb instance.
+- **The demo target page (day 3) must render more than 200 readable chars**,
+  or every demo run reports "too little text to judge". Tiny-but-legit pages
+  hit the same threshold, and the mission log explains why honestly.
 - **Never judge a condition against a scrap of navigation text.** Pages under
   `MIN_USEFUL_CHARS` (200) are reported as unusable with no verdict claimed,
   rather than producing a confident-sounding verdict from menu chrome.
@@ -216,3 +236,18 @@ characters of navigation chrome, which would have produced a confident but
 meaningless verdict. Measured real-world fetch reliability at 7/10 sites.
 Triggering is one-shot (fire, then stop) so a persistently true condition
 cannot produce an alert storm; resume re-arms it.
+
+**2026-07-23 (day 2 recheck).** Hardening pass before finalizing. Found and
+fixed four bugs: (1) the SSRF guard could be bypassed via redirect, because
+httpx auto-followed hops without re-validation; redirects are now manual and
+every hop is checked, verified against live httpbin attacks. (2) The 1 MB
+response cap sliced after download; now enforced while streaming. (3) The
+tick claim SQL was Postgres-only, so a fresh clone on the SQLite fallback
+would 500 on /tick; SQLite now gets an equivalent single-process path.
+(4) run-now on an already-triggered probe emitted duplicate trigger events;
+only active probes can fire now. Added the fetch escalation chain (TLS retry
+for broken government certs, then the r.jina.ai rendering proxy) and measured
+it: Pakistani gov and university sites went from 9/11 to 10/11 usable, with
+NADRA rescued through its WAF. Considered and rejected self-hosted Playwright
+rendering (too heavy for the 512 MB Koyeb instance) and an in-process
+scheduler (dies when the free instance sleeps; external cron stays).
