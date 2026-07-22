@@ -1,9 +1,6 @@
-"""FastAPI entrypoint for Argus.
+"""FastAPI entrypoint for Argus."""
 
-Day 1: app boots, health check, CORS, DB tables created, /tick secured. The
-watcher CRUD and run loop land on days 1-3 per the plan.
-"""
-
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -11,16 +8,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from .config import get_settings
-from .db import get_db, init_db
+from .db import SessionLocal, get_db, init_db
+from .deps import require_access
+from .routers import demo as demo_router
 from .routers import watchers
 from .tick import run_due_watchers
 
+logging.basicConfig(level=logging.INFO)
 settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # Seed the demo fleet once so the deployed site is never empty.
+    if settings.demo_mode:
+        from . import demo
+
+        with SessionLocal() as db:
+            demo.seed_fleet(db)
     yield
 
 
@@ -34,8 +40,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-app.include_router(watchers.router)
+# The whole watcher API is gated behind the shared access code. The demo router
+# gates its own write endpoints; /demo/target stays public so probes (and
+# graders) can read it.
+app.include_router(watchers.router, dependencies=[Depends(require_access)])
+app.include_router(demo_router.router)
 
 
 @app.get("/health")
@@ -52,8 +61,3 @@ def tick(
     if not settings.tick_secret or x_tick_secret != settings.tick_secret:
         raise HTTPException(status_code=401, detail="bad tick secret")
     return run_due_watchers(db)
-
-
-# TODO(day1-3): routers for /watchers (create, confirm, list, run-now, pause,
-# resume, delete) and /demo (target, mutate, seed). Kept out of main to stay
-# readable; add app.include_router(...) here as each lands.

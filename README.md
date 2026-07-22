@@ -34,8 +34,12 @@ Working:
 - One-shot triggering: a probe fires once then stops, resume re-arms it
 - Watcher management: create, confirm, list, get, pause, resume, retire
 - SSRF guard enforced at watcher creation, redirects re-validated per hop
+- **Access gate**: the whole watcher API sits behind a shared access code
+- **Self-running demo fleet**: seeded probes plus a demo target page whose
+  state cycles automatically, so the deployed site looks alive to a grader who
+  visits unattended
 
-Next (day 3): the self-hosted demo target page, then deploy to Koyeb + cron.
+Next: deploy to Koyeb + cron, then the React frontend on Vercel.
 
 ---
 
@@ -66,7 +70,10 @@ cron -> POST /tick -> claim due watchers (atomic)
 | `app/mailer.py` | SMTP alert delivery |
 | `app/notify.py` | Channel dispatcher: email now, WhatsApp when enabled |
 | `app/email_templates.py` | Injection-safe HTML alerts, one style per category |
+| `app/demo.py` | Demo target page, auto-cycle, seed fleet |
+| `app/deps.py` | Shared access-code dependency |
 | `app/routers/watchers.py` | Commissioner flow and fleet management |
+| `app/routers/demo.py` | Demo target, presence pulse, seed |
 
 ### The three AI roles
 
@@ -123,6 +130,10 @@ committed. See `.env.example` for guidance on each.
 | `OWNER_EMAIL` | Default recipient / demo fallback |
 | `WHATSAPP_PHONE` / `WHATSAPP_APIKEY` | Optional CallMeBot channel, off when blank |
 | `TICK_SECRET` | Long random string, sent by cron as `X-Tick-Secret` |
+| `ACCESS_CODE` | Shared passphrase for the app; blank = open (dev) |
+| `DEMO_MODE` | Seed and cycle the demo fleet (default true) |
+| `DEMO_CYCLE_MINUTES` | How often the demo target flips open/closed |
+| `PUBLIC_BASE_URL` | This backend's public URL, for the demo target link |
 | `ALLOWED_ORIGIN` | Frontend origin for CORS |
 | `LLM_DAILY_BUDGET` | Gemini calls/day before forcing the Groq fallback |
 
@@ -144,6 +155,13 @@ committed. See `.env.example` for guidance on each.
 | POST | `/watchers/{id}/resume` | Resume, re-arms a triggered probe |
 | DELETE | `/watchers/{id}` | Retire |
 | POST | `/tick` | Cron heartbeat, requires `X-Tick-Secret` |
+| GET | `/demo/target` | Public demo page a probe watches; state cycles |
+| POST | `/demo/pulse` | Presence ping: advance demo + run its probes now |
+| POST | `/demo/seed` | Seed the demo fleet (idempotent) |
+
+The watcher endpoints require the `X-Access-Code` header when `ACCESS_CODE` is
+set. `/demo/target` is always public (a probe, and a grader, must be able to
+read it); the demo write endpoints require the code.
 
 Creating a probe is deliberately two steps so the user sees exactly what the
 agent understood before anything is stored.
@@ -160,9 +178,18 @@ agent understood before anything is stored.
   a watcher could never email the address the user typed in. SMTP reaches any
   recipient with no domain and no extra service.
 - **psycopg 3**, not psycopg2. Better wheel support on Python 3.14.
-- **No user accounts, by design.** Single-user demo app. Protected instead by
-  the `/tick` shared secret, a global cap on active watchers, and validation
-  on every user-supplied URL.
+- **No user accounts, by design.** One shared access code (`ACCESS_CODE`) gates
+  the whole watcher API; the frontend prompts for it once and also asks for the
+  user's email for notifications. No signup, to protect the limited free API.
+  The code matters because the repo is public and the live URL ends up in it,
+  so the URL is effectively public and obscurity is not protection. Even if the
+  code leaks, `MAX_ACTIVE_WATCHERS` and the daily LLM budget bound the damage.
+- **The demo fleet is self-running.** A grader visits unattended, so the demo
+  target page cycles its own state (`DEMO_CYCLE_MINUTES`) and a seeded probe
+  triggers on its own. Presence based: opening the site pulses the demo so it
+  looks alive right then; a slow cron baseline keeps it fresh otherwise. Demo
+  probe alerts are recorded and shown in-app but NOT emailed, so they do not
+  spam the owner inbox or burn the Gmail quota every cycle.
 - **Two-step watcher creation** so the parsed spec is always confirmed by a
   human before an agent goes live.
 
@@ -296,5 +323,18 @@ against injection: all values HTML-escaped, hrefs scheme-checked (a
 SMTP header injection. Verified with live `<script>`, `<img onerror>` and CRLF
 attacks, and by emailing one live sample of every template. Removed the double
 "Argus Mission Control" sign-off (the Herald no longer signs; the footer
-does). Real trigger to real inbox still verified end to end. Next: the demo
-target page, then Koyeb deploy + cron.
+does). Real trigger to real inbox still verified end to end.
+
+**2026-07-23 (day 3, access + demo fleet).** Added the access gate and the
+self-running demo, driven by how the site is actually graded: unattended, on
+the grader's own time. One shared `ACCESS_CODE` gates the watcher API (frontend
+prompts once, sends it as a header); `/demo/target` stays public. Seeded a
+3-probe demo fleet on startup and a demo target page whose availability cycles
+automatically, so a probe triggers on its own and the mission log is never
+empty. Presence based (opening the site pulses the demo) plus a slow cron
+baseline. Demo alerts are recorded and shown in-app but not emailed, so they do
+not spam the owner inbox every cycle. The demo target is read straight from its
+DB state (the SSRF guard would block an HTTP call to our own localhost URL, and
+this avoids the round trip while keeping the AI judging real). 14/14 demo
+checks pass, 17/17 core audit still green. Next: Koyeb deploy + cron, then the
+React frontend.

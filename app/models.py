@@ -40,6 +40,8 @@ class Watcher(Base):
     last_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     next_run_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    # Marks a member of the seeded demo fleet (kept alive, re-armed on cycle).
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
 
     runs: Mapped[list["Run"]] = relationship(
         back_populates="watcher", cascade="all, delete-orphan"

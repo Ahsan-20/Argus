@@ -61,6 +61,15 @@ class Settings(BaseSettings):
     max_runs_per_tick: int = 5
     max_active_watchers: int = 25
 
+    # ---- Access + demo ----
+    # Shared passphrase the frontend sends as X-Access-Code. Empty = open (dev).
+    access_code: str = ""
+    # Seed and keep a demo fleet alive so the deployed site looks active.
+    demo_mode: bool = True
+    demo_cycle_minutes: int = 20  # how often the demo target flips open/closed
+    # Public base URL of THIS backend, used to display the demo target link.
+    public_base_url: str = "http://localhost:8000"
+
 
 @lru_cache
 def get_settings() -> Settings:

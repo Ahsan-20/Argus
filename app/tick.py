@@ -97,10 +97,17 @@ def _build_watcher_input(watcher: Watcher, page_text: str) -> str:
 
 def execute_watcher(db: Session, watcher: Watcher) -> Run:
     """Run one pass of a watcher: fetch, judge, record, maybe trigger."""
+    from . import demo  # local import avoids a circular import at module load
+
     run = Run(watcher_id=watcher.id, started_at=datetime.now(timezone.utc))
 
     try:
-        page_text = fetch_readable_text(watcher.url)
+        # The demo target is read straight from its DB state, so the AI judging
+        # stays real without an HTTP round trip to our own (SSRF-blocked) URL.
+        if demo.is_demo_target(watcher.url):
+            page_text = demo.target_text(db)
+        else:
+            page_text = fetch_readable_text(watcher.url)
 
         if len(page_text.strip()) < MIN_USEFUL_CHARS:
             run.error = "page returned too little readable text to judge"
@@ -233,12 +240,18 @@ def _trigger(db: Session, watcher: Watcher, run: Run) -> None:
         evidence=run.evidence,
         url=watcher.url,
     )
-    channels = deliver_alert(
-        email=watcher.email,
-        subject=alert["subject"],
-        body=alert["body"],
-        html=html,
-    )
+    if watcher.is_demo:
+        # Demo probes re-trigger every cycle around the clock. Recording the
+        # alert (so the app shows it) without actually sending keeps the owner
+        # inbox and the Gmail quota clean. Real watchers still email for real.
+        channels = {"email": {"sent": False, "note": "demo alert, not delivered"}}
+    else:
+        channels = deliver_alert(
+            email=watcher.email,
+            subject=alert["subject"],
+            body=alert["body"],
+            html=html,
+        )
     db.add(
         Event(
             watcher_id=watcher.id,
@@ -258,6 +271,13 @@ def _trigger(db: Session, watcher: Watcher, run: Run) -> None:
 
 def run_due_watchers(db: Session) -> dict:
     """Process one tick: claim due watchers and run each of them."""
+    if settings.demo_mode:
+        # Slow baseline: advance the demo cycle even when nobody is on the site,
+        # so the mission log keeps producing fresh triggers unattended.
+        from . import demo
+
+        demo.advance_cycle(db)
+
     claimed = claim_due_watchers(db)
     results = []
     for watcher_id in claimed:
