@@ -14,7 +14,7 @@ Frontend lives in a separate repository.
 
 ## Status
 
-**Day 3 in progress (2026-07-23). End-to-end alerts now work.**
+**Backend finalized (2026-07-23). Agents extract data, not just notify.**
 
 Working:
 - FastAPI app on Supabase Postgres, tables auto-create on startup
@@ -22,7 +22,9 @@ Working:
 - Daily LLM budget counter tracked in the database
 - **The Commissioner**: plain English becomes a structured watcher spec
 - **The Watcher**: fetches a live page and returns a verdict with confidence,
-  a quoted evidence line, and mission-log reasoning
+  a quoted evidence line, mission-log reasoning, AND extracts a tracked data
+  point (e.g. a price, a version, a count) so the agent produces output over
+  time, not just a yes/no alert
 - **The Herald**: on a trigger, writes the alert (subject + body), with a
   deterministic template fallback if the model hiccups
 - **Real alert delivery**: a triggered probe emails the user (verified live to
@@ -39,6 +41,8 @@ Working:
   Wikipedia, Hacker News) so the deployed dashboard is populated and honest
 - **On-demand demonstration**: a single labelled demo probe that fires only
   when a user presses "Run a live demonstration", against a synthetic target
+- **Fleet stats** and a **DB-checked health** endpoint for the dashboard/deploy
+- **Committed unit tests** (`tests/`, run with pytest, no keys needed)
 
 Next: deploy to Koyeb + cron, then the React frontend on Vercel.
 
@@ -74,7 +78,8 @@ cron -> POST /tick -> claim due watchers (atomic)
 | `app/demo.py` | Demo target page, auto-cycle, seed fleet |
 | `app/deps.py` | Shared access-code dependency |
 | `app/routers/watchers.py` | Commissioner flow and fleet management |
-| `app/routers/demo.py` | Demo target, presence pulse, seed |
+| `app/routers/demo.py` | Demo target page and on-demand demonstration |
+| `tests/` | Committed, CI-safe unit tests (no keys or network) |
 
 ### The three AI roles
 
@@ -83,7 +88,11 @@ README (a grading requirement). Never inline a prompt anywhere else.
 
 1. **The Commissioner** turns a sentence into a testable watcher spec, or refuses.
 2. **The Watcher** judges one fetch against the condition and returns a verdict
-   with confidence, evidence and reasoning.
+   with confidence, evidence and reasoning. It also extracts an optional
+   tracked data point (the price, the version, the count the user asked to
+   follow), which is logged each run so the agent builds a record over time.
+   This is what makes each probe an autonomous worker rather than a
+   change-notifier: it reads, reasons, extracts, and acts.
 3. **The Herald** writes the alert (subject + body) once a probe triggers, and
    classifies it into a category (availability, price, release, status,
    generic). A deterministic template is used if the model call fails, so an
@@ -116,6 +125,19 @@ uvicorn app.main:app --reload
 
 Interactive API docs at `http://localhost:8000/docs`.
 
+### Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+The committed suite (`tests/`) is deterministic and needs no API keys or
+network: SSRF guard, email injection safety and category selection, SMTP
+header-injection defence, JSON parsing, demo helpers. Live integration checks
+(real LLM verdicts, real email delivery) are run manually against the
+configured providers.
+
 ### Environment variables
 
 Names only. Real values go in `.env`, which is gitignored and must never be
@@ -144,7 +166,8 @@ committed. See `.env.example` for guidance on each.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/health` | Liveness |
+| GET | `/health` | Liveness plus a real DB round trip |
+| GET | `/stats` | Fleet overview for the dashboard |
 | POST | `/watchers` | Commissioner parses a sentence, writes nothing |
 | POST | `/watchers/confirm` | Launch the confirmed probe |
 | GET | `/watchers` | List the fleet |
@@ -351,5 +374,16 @@ demonstration; the alert is shown in-app, never emailed. Also hardened startup:
 a crashed local test left a session idle-in-transaction holding a lock, which
 made `ALTER TABLE` in startup hang; the migration now sets a `lock_timeout` and
 skips rather than hanging (production closes sessions cleanly via get_db, so it
-never causes this itself). 10/10 hybrid checks pass. Next: Koyeb deploy + cron,
-then the React frontend with the demo button.
+never causes this itself). 10/10 hybrid checks pass.
+
+**2026-07-23 (backend finalized).** Closed the gap that made Argus feel like a
+notifier: agents now extract and track a data point every run, not just judge a
+yes/no condition. The Commissioner pulls an optional `track` phrase from the
+order ("keep track of the latest Python 3 version"), and the Watcher returns an
+`extracted` value each run, logged over time. Verified live: an agent watching
+python.org judged "is Python 4 out" as false while extracting "3.14.6" off the
+page in the same pass. Also added a `/stats` fleet overview, a `/health` that
+does a real DB round trip, and a committed pytest suite (23 tests, no keys or
+network: SSRF, email injection, category selection, header injection, parsing).
+23 unit + 17 core audit + 6 live tracking checks all green. Next: Koyeb deploy
++ cron, then the React frontend.

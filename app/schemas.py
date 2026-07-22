@@ -16,6 +16,7 @@ class WatcherSpec(BaseModel):
     callsign: str
     url: str
     condition: str
+    track: str = ""  # optional data point the agent tracks over time
     cadence_minutes: int
     email: str
 
@@ -33,6 +34,7 @@ class RunOut(BaseModel):
     verdict_met: bool | None
     confidence: int | None
     evidence: str | None
+    extracted: str | None = None
     reasoning: str | None
     page_summary: str | None
     error: str | None
@@ -56,6 +58,7 @@ class WatcherOut(BaseModel):
     callsign: str
     url: str
     condition: str
+    track: str | None = None
     cadence_minutes: int
     email: str
     status: str

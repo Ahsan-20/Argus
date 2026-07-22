@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from .config import get_settings
@@ -50,8 +51,44 @@ app.include_router(demo_router.router)
 
 
 @app.get("/health")
-def health() -> dict:
-    return {"status": "ok", "service": "argus", "env": settings.app_env}
+def health(db: Session = Depends(get_db)) -> dict:
+    """Liveness plus a real database round trip, for the deploy health check."""
+    db_ok = True
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        db_ok = False
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "service": "argus",
+        "env": settings.app_env,
+        "db": db_ok,
+    }
+
+
+@app.get("/stats")
+def stats(db: Session = Depends(get_db)) -> dict:
+    """Fleet overview for the dashboard header."""
+    from .models import Run, Watcher
+
+    by_status = dict(
+        db.query(Watcher.status, func.count(Watcher.id))
+        .group_by(Watcher.status)
+        .all()
+    )
+    total_watchers = db.query(func.count(Watcher.id)).scalar() or 0
+    total_runs = db.query(func.count(Run.id)).scalar() or 0
+    triggered = (
+        db.query(func.count(Run.id)).filter(Run.verdict_met.is_(True)).scalar() or 0
+    )
+    last_run = db.query(func.max(Run.started_at)).scalar()
+    return {
+        "total_watchers": total_watchers,
+        "by_status": by_status,
+        "total_runs": total_runs,
+        "positive_verdicts": triggered,
+        "last_run_at": last_run.isoformat() if last_run else None,
+    }
 
 
 @app.post("/tick")

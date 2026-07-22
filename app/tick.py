@@ -95,8 +95,10 @@ def claim_due_watchers(db: Session) -> list[int]:
 
 def _build_watcher_input(watcher: Watcher, page_text: str) -> str:
     previous = watcher.last_snapshot or "(no previous pass)"
+    track = watcher.track or "(nothing to track)"
     return (
         f"WATCH CONDITION:\n{watcher.condition}\n\n"
+        f"DATA POINT TO TRACK:\n{track}\n\n"
         f"PREVIOUS PAGE SUMMARY:\n{previous}\n\n"
         f"CURRENT PAGE TEXT:\n{page_text}"
     )
@@ -139,6 +141,9 @@ def execute_watcher(db: Session, watcher: Watcher) -> Run:
             run.verdict_met = bool(verdict.get("met"))
             run.confidence = int(verdict.get("confidence") or 0)
             run.evidence = (verdict.get("evidence") or "")[:4000]
+            run.extracted = ((verdict.get("extracted") or "").strip() or None)
+            if run.extracted:
+                run.extracted = run.extracted[:500]
             run.reasoning = (verdict.get("reasoning") or "")[:4000]
             run.page_summary = (verdict.get("page_summary") or "")[:2000]
             run.provider = meta.get("provider")

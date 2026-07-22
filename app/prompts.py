@@ -22,6 +22,11 @@ Return ONLY a JSON object with these fields:
                    reader could answer by looking at the page. Strip vague
                    words. Example: "Is any appointment slot before September
                    2026 shown as available?"
+  track            OPTIONAL. A single specific data point the agent should
+                   extract and log on every visit, phrased as a short noun
+                   phrase, e.g. "the current ticket price" or "the number of
+                   available slots". Use "" if the user only wants a yes/no
+                   watch and nothing tracked over time.
   cadence_minutes  How often to check, as an integer. Default 30. Clamp to the
                    range 15 to 1440. Choose faster only if the user clearly
                    needs it, slower for slow-moving pages.
@@ -44,15 +49,20 @@ ads, cookie banners, or unrelated dates.
 # ---------------------------------------------------------------------------
 WATCHER_PROMPT = """\
 You are a Watcher probe in the Argus fleet. On each pass you are given your
-watch condition, the readable text extracted from the target page right now,
-and a short summary of what the page looked like last time. Decide whether the
-condition is currently met.
+watch condition, an optional data point to track, the readable text extracted
+from the target page right now, and a short summary of what the page looked
+like last time. Decide whether the condition is currently met, and if a data
+point was requested, extract its current value.
 
 Return ONLY a JSON object:
   met           true or false: is the condition satisfied on the page NOW.
   confidence    0 to 100: how sure you are, based on concrete page evidence.
   evidence      A short verbatim quote from the page text that supports your
                 verdict. If nothing supports it, say "no supporting text found".
+  extracted     If a data point to track was given, its current value as a
+                short string exactly as it appears on the page (e.g. "$479",
+                "3 slots", "12 August"). If none was requested, or it cannot be
+                found, use "".
   reasoning     2 to 4 sentences in calm mission-control voice explaining the
                 verdict for the mission log.
   page_summary  One sentence capturing the current state, to compare next pass.
@@ -106,6 +116,7 @@ COMMISSIONER_SCHEMA = {
         "callsign": {"type": "STRING"},
         "url": {"type": "STRING"},
         "condition": {"type": "STRING"},
+        "track": {"type": "STRING"},
         "cadence_minutes": {"type": "INTEGER"},
         "email": {"type": "STRING"},
         "ok": {"type": "BOOLEAN"},
@@ -115,6 +126,7 @@ COMMISSIONER_SCHEMA = {
         "callsign",
         "url",
         "condition",
+        "track",
         "cadence_minutes",
         "email",
         "ok",
@@ -128,10 +140,18 @@ WATCHER_SCHEMA = {
         "met": {"type": "BOOLEAN"},
         "confidence": {"type": "INTEGER"},
         "evidence": {"type": "STRING"},
+        "extracted": {"type": "STRING"},
         "reasoning": {"type": "STRING"},
         "page_summary": {"type": "STRING"},
     },
-    "required": ["met", "confidence", "evidence", "reasoning", "page_summary"],
+    "required": [
+        "met",
+        "confidence",
+        "evidence",
+        "extracted",
+        "reasoning",
+        "page_summary",
+    ],
 }
 
 HERALD_CATEGORIES = ("availability", "price", "release", "status", "generic")

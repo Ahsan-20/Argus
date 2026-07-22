@@ -33,6 +33,9 @@ class Watcher(Base):
     callsign: Mapped[str] = mapped_column(String(32))  # e.g. PROBE-01
     url: Mapped[str] = mapped_column(Text)
     condition: Mapped[str] = mapped_column(Text)  # testable question
+    # Optional data point the agent extracts and logs every run (e.g. "the
+    # current price"). Turns the agent from a notifier into a tracker.
+    track: Mapped[str | None] = mapped_column(Text, nullable=True)
     cadence_minutes: Mapped[int] = mapped_column(Integer, default=30)
     email: Mapped[str] = mapped_column(String(255))
     # active | paused | triggered | retired
@@ -65,6 +68,8 @@ class Run(Base):
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
     reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     page_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The value the agent extracted this run for the watcher's `track` field.
+    extracted: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Which provider/model actually judged this pass. Shown in the mission log
     # so a Groq fallback is visible rather than hidden.

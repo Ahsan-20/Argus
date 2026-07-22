@@ -119,18 +119,21 @@ REAL_FLEET = [
         "callsign": "PROBE-01",
         "url": "https://www.python.org/downloads/",
         "condition": "Is a stable Python 4 release available for download?",
+        "track": "the latest Python 3 version number shown",
         "cadence_minutes": 120,
     },
     {
         "callsign": "PROBE-02",
         "url": "https://en.wikipedia.org/wiki/Pakistan",
         "condition": "Does the page state that Islamabad is the capital of Pakistan?",
+        "track": "the stated population of Pakistan",
         "cadence_minutes": 180,
     },
     {
         "callsign": "PROBE-03",
         "url": "https://news.ycombinator.com",
         "condition": "Does any front page story mention AI or a language model?",
+        "track": "the title of the current top story",
         "cadence_minutes": 60,
     },
 ]
@@ -141,16 +144,21 @@ def ensure_real_fleet(db: Session) -> int:
     email = settings.owner_email or "demo@example.com"
     created = 0
     for spec in REAL_FLEET:
-        exists = (
-            db.query(Watcher).filter(Watcher.callsign == spec["callsign"]).count() > 0
+        existing = (
+            db.query(Watcher).filter(Watcher.callsign == spec["callsign"]).first()
         )
-        if exists:
+        if existing is not None:
+            # Keep the seeded probe's tracked field in sync with the spec.
+            if existing.track != spec.get("track"):
+                existing.track = spec.get("track")
+                db.commit()
             continue
         db.add(
             Watcher(
                 callsign=spec["callsign"],
                 url=spec["url"],
                 condition=spec["condition"],
+                track=spec.get("track"),
                 cadence_minutes=spec["cadence_minutes"],
                 email=email,
                 status="active",
@@ -180,6 +188,7 @@ def ensure_demo_probe(db: Session) -> Watcher:
         callsign=DEMO_CALLSIGN,
         url=demo_target_url(),
         condition="Are appointment slots currently available for booking?",
+        track="the number of appointment slots open",
         cadence_minutes=60,
         email=settings.owner_email or "demo@example.com",
         status="standby",  # excluded from the scheduler; runs only on demand

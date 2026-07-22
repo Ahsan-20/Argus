@@ -90,6 +90,7 @@ def parse_order(payload: CreateWatcherRequest, db: Session = Depends(get_db)):
         callsign=_next_callsign(db),
         url=_validated_url(spec.get("url", "")),
         condition=spec.get("condition", ""),
+        track=(spec.get("track") or "").strip(),
         cadence_minutes=max(MIN_CADENCE, min(MAX_CADENCE, cadence)),
         email=_validated_email(spec.get("email", "")),
     )
@@ -120,6 +121,7 @@ def launch(payload: ConfirmWatcherRequest, db: Session = Depends(get_db)):
         # directly and must never accept an internal address.
         url=_validated_url(payload.url),
         condition=condition,
+        track=(payload.track or "").strip() or None,
         cadence_minutes=max(MIN_CADENCE, min(MAX_CADENCE, payload.cadence_minutes)),
         email=_validated_email(payload.email),
         status="active",
