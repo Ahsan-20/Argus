@@ -45,6 +45,17 @@ class Settings(BaseSettings):
     # Optional default recipient (demo fleet / fallback when a watcher has none).
     owner_email: str = ""
 
+    # ---- WhatsApp channel (optional second channel, via CallMeBot) ----
+    # Free, no signup: message the CallMeBot number once to get an api key
+    # bound to your number. Leave blank to keep the channel off. Alerts still
+    # go by email; WhatsApp is added on top when both fields are set.
+    whatsapp_phone: str = ""  # recipient in international form, e.g. +9231...
+    whatsapp_apikey: str = ""
+
+    @property
+    def whatsapp_enabled(self) -> bool:
+        return bool(self.whatsapp_phone and self.whatsapp_apikey)
+
     # ---- Scheduler / limits ----
     tick_secret: str = ""  # shared secret the cron sends in a header
     max_runs_per_tick: int = 5

@@ -21,6 +21,7 @@ from ..prompts import COMMISSIONER_PROMPT, COMMISSIONER_SCHEMA
 from ..schemas import (
     ConfirmWatcherRequest,
     CreateWatcherRequest,
+    EventOut,
     RunOut,
     WatcherOut,
     WatcherSpec,
@@ -162,6 +163,23 @@ def mission_log(watcher_id: int, limit: int = 50, db: Session = Depends(get_db))
         .filter(Run.watcher_id == watcher_id)
         .order_by(Run.id.desc())
         .limit(max(1, min(limit, 200)))
+        .all()
+    )
+
+
+@router.get("/{watcher_id}/transmissions", response_model=list[EventOut])
+def transmissions(watcher_id: int, db: Session = Depends(get_db)):
+    """Alerts this probe has sent, newest first.
+
+    Rendering the sent message in-app means the grader always sees the alert,
+    even if the email is filtered to spam.
+    """
+    if not db.get(Watcher, watcher_id):
+        raise HTTPException(status_code=404, detail="no such probe")
+    return (
+        db.query(Event)
+        .filter(Event.watcher_id == watcher_id, Event.type == "emailed")
+        .order_by(Event.id.desc())
         .all()
     )
 

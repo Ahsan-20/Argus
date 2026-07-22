@@ -40,6 +40,15 @@ class RunOut(BaseModel):
     model: str | None = None
 
 
+class EventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    type: str
+    payload: str | None
+    created_at: datetime
+
+
 class WatcherOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

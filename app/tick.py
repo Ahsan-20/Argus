@@ -21,7 +21,8 @@ from .config import get_settings
 from .fetcher import MIN_USEFUL_CHARS, UnsafeUrlError, fetch_readable_text
 from .llm import complete_json
 from .models import Event, Run, Watcher
-from .prompts import WATCHER_PROMPT, WATCHER_SCHEMA
+from .notify import deliver_alert
+from .prompts import HERALD_PROMPT, HERALD_SCHEMA, WATCHER_PROMPT, WATCHER_SCHEMA
 
 settings = get_settings()
 logger = logging.getLogger("argus.tick")
@@ -158,11 +159,65 @@ def execute_watcher(db: Session, watcher: Watcher) -> Run:
     return run
 
 
+def _compose_alert(watcher: Watcher, run: Run) -> dict:
+    """The Herald writes the alert. Falls back to a plain template if it fails."""
+    user = (
+        f"CALLSIGN: {watcher.callsign}\n"
+        f"WATCHED URL: {watcher.url}\n"
+        f"CONDITION: {watcher.condition}\n"
+        f"EVIDENCE: {run.evidence}\n"
+        f"REASONING: {run.reasoning}\n"
+    )
+    try:
+        alert = complete_json(
+            system=HERALD_PROMPT,
+            user=user,
+            model=settings.gemini_model_herald,
+            schema=HERALD_SCHEMA,
+        )
+        subject = (alert.get("subject") or "").strip()
+        body = (alert.get("body") or "").strip()
+        if subject and body:
+            return {"subject": subject, "body": body}
+    except Exception as exc:
+        logger.warning("Herald failed for %s, using template: %s", watcher.callsign, exc)
+
+    # Deterministic fallback so an alert is never lost to an LLM hiccup.
+    return {
+        "subject": f"{watcher.callsign}: your watched condition is now met",
+        "body": (
+            f"Your probe {watcher.callsign} reports that the condition is met.\n\n"
+            f"Watching: {watcher.url}\n"
+            f"Condition: {watcher.condition}\n"
+            f"Evidence: {run.evidence}\n\n"
+            f"Check it now: {watcher.url}\n\n"
+            f"Argus Mission Control"
+        ),
+    }
+
+
+def _alert_html(watcher: Watcher, subject: str, body: str) -> str:
+    """A small, self-contained HTML version in the mission-control palette."""
+    safe_body = body.replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br>")
+    return (
+        '<div style="background:#0B0E1A;color:#C9D1E3;font-family:monospace;'
+        'padding:24px;border:1px solid #232838;max-width:560px">'
+        f'<div style="color:#FFB000;letter-spacing:2px;font-size:12px">'
+        f'ARGUS // {watcher.callsign}</div>'
+        f'<h2 style="color:#fff;font-family:sans-serif">{subject}</h2>'
+        f'<p style="line-height:1.6">{safe_body}</p>'
+        f'<a href="{watcher.url}" style="color:#3DDC84">Open target &rarr;</a>'
+        "</div>"
+    )
+
+
 def _trigger(db: Session, watcher: Watcher, run: Run) -> None:
     """Fire once, then stop. Resuming re-arms against the new page state.
 
     One-shot prevents an alert storm when a condition stays true across many
-    consecutive passes. The Herald email lands on day 3.
+    consecutive passes. The Herald composes the alert and it is delivered on
+    every enabled channel; the full sent message is stored so the app can show
+    it even if the email is filtered.
     """
     watcher.status = "triggered"
     db.add(
@@ -175,6 +230,29 @@ def _trigger(db: Session, watcher: Watcher, run: Run) -> None:
         )
     )
     logger.info("PROBE %s TRIGGERED (confidence %s)", watcher.callsign, run.confidence)
+
+    alert = _compose_alert(watcher, run)
+    html = _alert_html(watcher, alert["subject"], alert["body"])
+    channels = deliver_alert(
+        email=watcher.email,
+        subject=alert["subject"],
+        body=alert["body"],
+        html=html,
+    )
+    db.add(
+        Event(
+            watcher_id=watcher.id,
+            type="emailed",
+            payload=json.dumps(
+                {
+                    "subject": alert["subject"],
+                    "body": alert["body"],
+                    "to": watcher.email,
+                    "channels": channels,
+                }
+            ),
+        )
+    )
 
 
 def run_due_watchers(db: Session) -> dict:

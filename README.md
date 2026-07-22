@@ -14,7 +14,7 @@ Frontend lives in a separate repository.
 
 ## Status
 
-**Day 2 of 6 complete and hardened (2026-07-23). Probes run, judge, report.**
+**Day 3 in progress (2026-07-23). End-to-end alerts now work.**
 
 Working:
 - FastAPI app on Supabase Postgres, tables auto-create on startup
@@ -23,14 +23,19 @@ Working:
 - **The Commissioner**: plain English becomes a structured watcher spec
 - **The Watcher**: fetches a live page and returns a verdict with confidence,
   a quoted evidence line, and mission-log reasoning
+- **The Herald**: on a trigger, writes the alert (subject + body), with a
+  deterministic template fallback if the model hiccups
+- **Real alert delivery**: a triggered probe emails the user (verified live to
+  a real inbox), and the full sent message is stored and viewable in-app
+- Notification dispatcher with a WhatsApp channel (CallMeBot) implemented and
+  gated off until its two env vars are set
 - Full run loop: `/tick` claims due probes, runs each, stores the pass
-- Mission log per probe, and run-now for instant demos
+- Mission log and transmissions per probe, run-now for instant demos
 - One-shot triggering: a probe fires once then stops, resume re-arms it
 - Watcher management: create, confirm, list, get, pause, resume, retire
-- SSRF guard enforced at watcher creation, not just at fetch time
+- SSRF guard enforced at watcher creation, redirects re-validated per hop
 
-Next (day 3): the Herald writing real alert emails, the trigger sending them,
-the self-hosted demo target page, and deploying the backend to Koyeb.
+Next (day 3): the self-hosted demo target page, then deploy to Koyeb + cron.
 
 ---
 
@@ -59,6 +64,7 @@ cron -> POST /tick -> claim due watchers (atomic)
 | `app/fetcher.py` | Page fetch + readable extraction + SSRF guard |
 | `app/tick.py` | Scheduler: atomic claim + run loop |
 | `app/mailer.py` | SMTP alert delivery |
+| `app/notify.py` | Channel dispatcher: email now, WhatsApp when enabled |
 | `app/routers/watchers.py` | Commissioner flow and fleet management |
 
 ### The three AI roles
@@ -69,7 +75,15 @@ README (a grading requirement). Never inline a prompt anywhere else.
 1. **The Commissioner** turns a sentence into a testable watcher spec, or refuses.
 2. **The Watcher** judges one fetch against the condition and returns a verdict
    with confidence, evidence and reasoning.
-3. **The Herald** writes the alert email once a probe triggers.
+3. **The Herald** writes the alert (subject + body) once a probe triggers. A
+   deterministic template is used if the model call fails, so an alert is
+   never lost to an LLM hiccup.
+
+Alerts go out through a notification dispatcher (`app/notify.py`) so channels
+are decoupled from the trigger. Email is always on. WhatsApp (via CallMeBot,
+free and keyless) is implemented and turns on when its two env vars are set.
+Each channel is exception-isolated: one failing channel never breaks a run or
+blocks the others.
 
 ---
 
@@ -98,6 +112,7 @@ committed. See `.env.example` for guidance on each.
 | `SMTP_USER` / `SMTP_PASSWORD` | Gmail address + 16-char App Password |
 | `SMTP_HOST` / `SMTP_PORT` | `smtp.gmail.com`, 587 (STARTTLS) or 465 (SSL) |
 | `OWNER_EMAIL` | Default recipient / demo fallback |
+| `WHATSAPP_PHONE` / `WHATSAPP_APIKEY` | Optional CallMeBot channel, off when blank |
 | `TICK_SECRET` | Long random string, sent by cron as `X-Tick-Secret` |
 | `ALLOWED_ORIGIN` | Frontend origin for CORS |
 | `LLM_DAILY_BUDGET` | Gemini calls/day before forcing the Groq fallback |
@@ -114,6 +129,7 @@ committed. See `.env.example` for guidance on each.
 | GET | `/watchers` | List the fleet |
 | GET | `/watchers/{id}` | Probe detail |
 | GET | `/watchers/{id}/runs` | Mission log, newest pass first |
+| GET | `/watchers/{id}/transmissions` | Alerts this probe has sent |
 | POST | `/watchers/{id}/run-now` | Ping immediately, does not shift the schedule |
 | POST | `/watchers/{id}/pause` | Pause |
 | POST | `/watchers/{id}/resume` | Resume, re-arms a triggered probe |
@@ -251,3 +267,13 @@ it: Pakistani gov and university sites went from 9/11 to 10/11 usable, with
 NADRA rescued through its WAF. Considered and rejected self-hosted Playwright
 rendering (too heavy for the 512 MB Koyeb instance) and an in-process
 scheduler (dies when the free instance sleeps; external cron stays).
+
+**2026-07-23 (day 3).** The Herald and real alert delivery. A triggered probe
+now composes an alert with the Herald (Gemini 3.6 Flash) and sends it; verified
+live end to end with a real email landing in the owner inbox, subject "PROBE-01:
+Python 3.x release download link detected". The full sent message is stored as
+an emailed event and exposed at `/watchers/{id}/transmissions`, so the app shows
+the alert even if the email is filtered. Added `app/notify.py` as a channel
+dispatcher with the WhatsApp channel (CallMeBot) implemented but dormant until
+its env vars are set, and a deterministic Herald template fallback so an alert
+survives an LLM failure. Next: the demo target page, then Koyeb deploy + cron.
