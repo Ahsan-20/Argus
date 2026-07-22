@@ -1,7 +1,10 @@
-"""The three Argus system prompts, in full.
+"""The three Argus system prompts, in full, plus their output schemas.
 
 These are exported verbatim into the README (a grading requirement). Keep this
 file the single source of truth: never inline a prompt elsewhere.
+
+The schemas are passed to the model as structured-output contracts, so a role
+physically cannot return a shape the rest of the code does not expect.
 """
 
 # ---------------------------------------------------------------------------
@@ -85,3 +88,50 @@ Return ONLY a JSON object:
 Keep it under 120 words. Never overstate certainty beyond the evidence given.
 Never add facts that are not in the evidence or reasoning provided.
 """
+
+
+# ---------------------------------------------------------------------------
+# Structured output contracts
+# ---------------------------------------------------------------------------
+COMMISSIONER_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "callsign": {"type": "STRING"},
+        "url": {"type": "STRING"},
+        "condition": {"type": "STRING"},
+        "cadence_minutes": {"type": "INTEGER"},
+        "email": {"type": "STRING"},
+        "ok": {"type": "BOOLEAN"},
+        "message": {"type": "STRING"},
+    },
+    "required": [
+        "callsign",
+        "url",
+        "condition",
+        "cadence_minutes",
+        "email",
+        "ok",
+        "message",
+    ],
+}
+
+WATCHER_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "met": {"type": "BOOLEAN"},
+        "confidence": {"type": "INTEGER"},
+        "evidence": {"type": "STRING"},
+        "reasoning": {"type": "STRING"},
+        "page_summary": {"type": "STRING"},
+    },
+    "required": ["met", "confidence", "evidence", "reasoning", "page_summary"],
+}
+
+HERALD_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "subject": {"type": "STRING"},
+        "body": {"type": "STRING"},
+    },
+    "required": ["subject", "body"],
+}

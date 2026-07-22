@@ -16,39 +16,19 @@ from ..config import get_settings
 from ..db import get_db
 from ..fetcher import UnsafeUrlError, assert_safe_url
 from ..llm import LLMError, complete_json
-from ..models import Event, Watcher
-from ..prompts import COMMISSIONER_PROMPT
+from ..models import Event, Run, Watcher
+from ..prompts import COMMISSIONER_PROMPT, COMMISSIONER_SCHEMA
 from ..schemas import (
     ConfirmWatcherRequest,
     CreateWatcherRequest,
+    RunOut,
     WatcherOut,
     WatcherSpec,
 )
+from ..tick import execute_watcher
 
 router = APIRouter(prefix="/watchers", tags=["watchers"])
 settings = get_settings()
-
-COMMISSIONER_SCHEMA = {
-    "type": "OBJECT",
-    "properties": {
-        "callsign": {"type": "STRING"},
-        "url": {"type": "STRING"},
-        "condition": {"type": "STRING"},
-        "cadence_minutes": {"type": "INTEGER"},
-        "email": {"type": "STRING"},
-        "ok": {"type": "BOOLEAN"},
-        "message": {"type": "STRING"},
-    },
-    "required": [
-        "callsign",
-        "url",
-        "condition",
-        "cadence_minutes",
-        "email",
-        "ok",
-        "message",
-    ],
-}
 
 MIN_CADENCE = 15
 MAX_CADENCE = 1440
@@ -170,6 +150,32 @@ def get_watcher(watcher_id: int, db: Session = Depends(get_db)):
     if not watcher:
         raise HTTPException(status_code=404, detail="no such probe")
     return watcher
+
+
+@router.get("/{watcher_id}/runs", response_model=list[RunOut])
+def mission_log(watcher_id: int, limit: int = 50, db: Session = Depends(get_db)):
+    """Every pass this probe has made, newest first."""
+    if not db.get(Watcher, watcher_id):
+        raise HTTPException(status_code=404, detail="no such probe")
+    return (
+        db.query(Run)
+        .filter(Run.watcher_id == watcher_id)
+        .order_by(Run.id.desc())
+        .limit(min(limit, 200))
+        .all()
+    )
+
+
+@router.post("/{watcher_id}/run-now", response_model=RunOut)
+def run_now(watcher_id: int, db: Session = Depends(get_db)):
+    """Ping a probe immediately, without waiting for its next scheduled pass.
+
+    Does not shift next_run_at: a manual ping is extra, not a replacement.
+    """
+    watcher = db.get(Watcher, watcher_id)
+    if not watcher:
+        raise HTTPException(status_code=404, detail="no such probe")
+    return execute_watcher(db, watcher)
 
 
 def _set_status(db: Session, watcher_id: int, status: str) -> Watcher:

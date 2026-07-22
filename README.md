@@ -14,19 +14,23 @@ Frontend lives in a separate repository.
 
 ## Status
 
-**Day 1 of 6 complete (2026-07-22). Audited, 17/17 automated checks passing.**
+**Day 2 of 6 complete (2026-07-22). Probes now run, judge, and report.**
 
 Working:
 - FastAPI app on Supabase Postgres, tables auto-create on startup
 - LLM client with escalation: Gemini primary, backup Gemini model, then Groq
 - Daily LLM budget counter tracked in the database
 - **The Commissioner**: plain English becomes a structured watcher spec
+- **The Watcher**: fetches a live page and returns a verdict with confidence,
+  a quoted evidence line, and mission-log reasoning
+- Full run loop: `/tick` claims due probes, runs each, stores the pass
+- Mission log per probe, and run-now for instant demos
+- One-shot triggering: a probe fires once then stops, resume re-arms it
 - Watcher management: create, confirm, list, get, pause, resume, retire
-- Secured `/tick` heartbeat with atomic claiming of due watchers
 - SSRF guard enforced at watcher creation, not just at fetch time
 
-Next (day 2): the fetcher against real pages, the Watcher role that judges each
-pass, the tick run loop, and a run-now endpoint for instant demos.
+Next (day 3): the Herald writing real alert emails, the trigger sending them,
+the self-hosted demo target page, and deploying the backend to Koyeb.
 
 ---
 
@@ -109,6 +113,8 @@ committed. See `.env.example` for guidance on each.
 | POST | `/watchers/confirm` | Launch the confirmed probe |
 | GET | `/watchers` | List the fleet |
 | GET | `/watchers/{id}` | Probe detail |
+| GET | `/watchers/{id}/runs` | Mission log, newest pass first |
+| POST | `/watchers/{id}/run-now` | Ping immediately, does not shift the schedule |
 | POST | `/watchers/{id}/pause` | Pause |
 | POST | `/watchers/{id}/resume` | Resume, re-arms a triggered probe |
 | DELETE | `/watchers/{id}` | Retire |
@@ -162,8 +168,18 @@ Hard-won during setup. Do not re-learn these the hard way.
   foreign key violation.
 - **Callsigns come from `max(id)`, not row count**, so retiring a probe never
   causes a later one to reuse an existing callsign.
-- Some sites block datacenter IPs or need JavaScript. Failed fetches are
-  recorded honestly as error runs rather than hidden.
+- **Real-world fetch success is about 70 percent**, measured 2026-07-22 across
+  10 varied sites. Working: Wikipedia, Hacker News, GitHub releases,
+  python.org, BBC News, Ticketmaster, gov.uk. Returning too little text to
+  judge: Reddit, Amazon, Booking.com, all JavaScript rendered. This is better
+  than feared and the useful targets mostly work, but the README should stay
+  honest that JS-heavy storefronts are out of reach.
+- **Never judge a condition against a scrap of navigation text.** Pages under
+  `MIN_USEFUL_CHARS` (200) are reported as unusable with no verdict claimed,
+  rather than producing a confident-sounding verdict from menu chrome.
+- Failed fetches are recorded as honest error runs and shown in the mission
+  log. A probe reporting "target returned 403" is still the agent visibly
+  doing its job.
 
 ---
 
@@ -189,3 +205,14 @@ hole reachable via `/watchers/confirm`, a budget counter that committed on the
 caller's session, and callsign collisions after retirement. Verified the
 gitignore protects secrets, CORS is correct, and the day-2 tick claim SQL
 works on real Postgres with no double-runs.
+
+**2026-07-22 (day 2).** The Watcher role, the run loop and the mission log.
+Probes now fetch a live page, judge it, quote evidence, and record the pass
+with which model judged it. Verified against real sites: a true condition on
+python.org triggered at confidence 100 with a quoted download line, a false
+condition on example.com correctly did not trigger, and a full `/tick` pass
+processed both. Added `MIN_USEFUL_CHARS` after finding that Amazon returns 142
+characters of navigation chrome, which would have produced a confident but
+meaningless verdict. Measured real-world fetch reliability at 7/10 sites.
+Triggering is one-shot (fire, then stop) so a persistently true condition
+cannot produce an alert storm; resume re-arms it.

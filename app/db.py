@@ -4,7 +4,7 @@ Falls back to a local SQLite file when DATABASE_URL is empty so the app can
 boot on a fresh clone before Supabase is wired up.
 """
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import get_settings
@@ -53,3 +53,22 @@ def init_db() -> None:
     from . import models  # noqa: F401  (register mappers)
 
     Base.metadata.create_all(bind=engine)
+    _ensure_columns()
+
+
+# create_all only creates missing TABLES, never missing columns. This handles
+# the handful of columns added after a table already existed. Idempotent, so it
+# is safe to run on every startup. If the schema churns much more than this,
+# switch to Alembic.
+_ADDED_COLUMNS = [
+    "ALTER TABLE runs ADD COLUMN IF NOT EXISTS provider VARCHAR(16)",
+    "ALTER TABLE runs ADD COLUMN IF NOT EXISTS model VARCHAR(64)",
+]
+
+
+def _ensure_columns() -> None:
+    if engine.dialect.name != "postgresql":
+        return  # the SQLite dev fallback is always created fresh
+    with engine.begin() as conn:
+        for stmt in _ADDED_COLUMNS:
+            conn.execute(text(stmt))

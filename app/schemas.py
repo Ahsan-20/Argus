@@ -36,6 +36,8 @@ class RunOut(BaseModel):
     reasoning: str | None
     page_summary: str | None
     error: str | None
+    provider: str | None = None
+    model: str | None = None
 
 
 class WatcherOut(BaseModel):

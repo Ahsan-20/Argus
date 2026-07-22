@@ -64,6 +64,10 @@ class Run(Base):
     reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     page_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Which provider/model actually judged this pass. Shown in the mission log
+    # so a Groq fallback is visible rather than hidden.
+    provider: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     watcher: Mapped["Watcher"] = relationship(back_populates="runs")
 
