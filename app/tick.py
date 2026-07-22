@@ -18,6 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .config import get_settings
+from .email_templates import category_of, render_alert_html
 from .fetcher import MIN_USEFUL_CHARS, UnsafeUrlError, fetch_readable_text
 from .llm import complete_json
 from .models import Event, Run, Watcher
@@ -160,7 +161,10 @@ def execute_watcher(db: Session, watcher: Watcher) -> Run:
 
 
 def _compose_alert(watcher: Watcher, run: Run) -> dict:
-    """The Herald writes the alert. Falls back to a plain template if it fails."""
+    """The Herald writes the alert. Falls back to a plain template if it fails.
+
+    Returns subject, body and a category used to pick the email design.
+    """
     user = (
         f"CALLSIGN: {watcher.callsign}\n"
         f"WATCHED URL: {watcher.url}\n"
@@ -178,7 +182,11 @@ def _compose_alert(watcher: Watcher, run: Run) -> dict:
         subject = (alert.get("subject") or "").strip()
         body = (alert.get("body") or "").strip()
         if subject and body:
-            return {"subject": subject, "body": body}
+            return {
+                "subject": subject,
+                "body": body,
+                "category": category_of(alert.get("category")),
+            }
     except Exception as exc:
         logger.warning("Herald failed for %s, using template: %s", watcher.callsign, exc)
 
@@ -190,25 +198,10 @@ def _compose_alert(watcher: Watcher, run: Run) -> dict:
             f"Watching: {watcher.url}\n"
             f"Condition: {watcher.condition}\n"
             f"Evidence: {run.evidence}\n\n"
-            f"Check it now: {watcher.url}\n\n"
-            f"Argus Mission Control"
+            f"Check it now."
         ),
+        "category": "generic",
     }
-
-
-def _alert_html(watcher: Watcher, subject: str, body: str) -> str:
-    """A small, self-contained HTML version in the mission-control palette."""
-    safe_body = body.replace("&", "&amp;").replace("<", "&lt;").replace("\n", "<br>")
-    return (
-        '<div style="background:#0B0E1A;color:#C9D1E3;font-family:monospace;'
-        'padding:24px;border:1px solid #232838;max-width:560px">'
-        f'<div style="color:#FFB000;letter-spacing:2px;font-size:12px">'
-        f'ARGUS // {watcher.callsign}</div>'
-        f'<h2 style="color:#fff;font-family:sans-serif">{subject}</h2>'
-        f'<p style="line-height:1.6">{safe_body}</p>'
-        f'<a href="{watcher.url}" style="color:#3DDC84">Open target &rarr;</a>'
-        "</div>"
-    )
 
 
 def _trigger(db: Session, watcher: Watcher, run: Run) -> None:
@@ -232,7 +225,14 @@ def _trigger(db: Session, watcher: Watcher, run: Run) -> None:
     logger.info("PROBE %s TRIGGERED (confidence %s)", watcher.callsign, run.confidence)
 
     alert = _compose_alert(watcher, run)
-    html = _alert_html(watcher, alert["subject"], alert["body"])
+    html = render_alert_html(
+        category=alert["category"],
+        callsign=watcher.callsign,
+        subject=alert["subject"],
+        body=alert["body"],
+        evidence=run.evidence,
+        url=watcher.url,
+    )
     channels = deliver_alert(
         email=watcher.email,
         subject=alert["subject"],
@@ -245,6 +245,7 @@ def _trigger(db: Session, watcher: Watcher, run: Run) -> None:
             type="emailed",
             payload=json.dumps(
                 {
+                    "category": alert["category"],
                     "subject": alert["subject"],
                     "body": alert["body"],
                     "to": watcher.email,

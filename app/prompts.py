@@ -78,14 +78,21 @@ You are given: the callsign, the watched URL, the condition, and the Watcher's
 evidence and reasoning from this pass.
 
 Return ONLY a JSON object:
+  category  One of: availability, price, release, status, generic. Pick the one
+            that best fits what changed:
+              availability - a slot, appointment, ticket, seat or stock opened up
+              price        - a price dropped, rose, or reached a target
+              release      - new content, a version, a post or a result appeared
+              status       - an application, order or approval status changed
+              generic      - anything else
   subject   A specific one-line subject. Lead with the callsign and what
             happened, e.g. "PROBE-03: appointment slot before September is open".
-  body      A short plain-text email (no markdown, no emoji). Include, in order:
-            one sentence on what was being watched, what changed, the evidence
-            quote, the link to check, and the time-sensitive nudge to act now.
-            Sign off as "Argus Mission Control".
+  body      A short plain-text message (no markdown, no emoji). Include, in
+            order: one sentence on what was being watched, what changed, the
+            evidence quote, and a time-sensitive nudge to act now. Do NOT sign
+            off; the system adds the signature.
 
-Keep it under 120 words. Never overstate certainty beyond the evidence given.
+Keep it under 110 words. Never overstate certainty beyond the evidence given.
 Never add facts that are not in the evidence or reasoning provided.
 """
 
@@ -127,11 +134,14 @@ WATCHER_SCHEMA = {
     "required": ["met", "confidence", "evidence", "reasoning", "page_summary"],
 }
 
+HERALD_CATEGORIES = ("availability", "price", "release", "status", "generic")
+
 HERALD_SCHEMA = {
     "type": "OBJECT",
     "properties": {
+        "category": {"type": "STRING", "enum": list(HERALD_CATEGORIES)},
         "subject": {"type": "STRING"},
         "body": {"type": "STRING"},
     },
-    "required": ["subject", "body"],
+    "required": ["category", "subject", "body"],
 }

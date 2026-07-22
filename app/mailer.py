@@ -14,6 +14,16 @@ from .config import get_settings
 settings = get_settings()
 
 
+def _one_line(value: str) -> str:
+    """Collapse newlines so a crafted subject/recipient cannot inject headers.
+
+    An attacker-controlled value with a CR/LF could otherwise smuggle extra
+    SMTP headers (a Bcc, a second body). Header values are single line by
+    definition, so flattening them is both safe and lossless here.
+    """
+    return " ".join((value or "").splitlines()).strip()
+
+
 def send_alert(
     *, to: str, subject: str, body: str, html: str | None = None
 ) -> dict:
@@ -22,7 +32,8 @@ def send_alert(
     Falls back to a non-sending preview (so the trigger flow stays testable)
     when SMTP credentials are not configured yet.
     """
-    recipient = to or settings.owner_email
+    recipient = _one_line(to or settings.owner_email)
+    subject = _one_line(subject)[:200] or "Argus alert"
     if not settings.smtp_user or not settings.smtp_password:
         return {
             "sent": False,
@@ -36,9 +47,9 @@ def send_alert(
     msg["From"] = f"{settings.smtp_from_name} <{settings.smtp_user}>"
     msg["To"] = recipient
     msg["Subject"] = subject
-    msg.set_content(body)
+    msg.set_content(body)  # plain-text part
     if html:
-        msg.add_alternative(html, subtype="html")
+        msg.add_alternative(html, subtype="html")  # preferred part
 
     _send(msg)
     return {"sent": True, "to": recipient, "subject": subject, "body": body}

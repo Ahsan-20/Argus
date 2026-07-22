@@ -65,6 +65,7 @@ cron -> POST /tick -> claim due watchers (atomic)
 | `app/tick.py` | Scheduler: atomic claim + run loop |
 | `app/mailer.py` | SMTP alert delivery |
 | `app/notify.py` | Channel dispatcher: email now, WhatsApp when enabled |
+| `app/email_templates.py` | Injection-safe HTML alerts, one style per category |
 | `app/routers/watchers.py` | Commissioner flow and fleet management |
 
 ### The three AI roles
@@ -75,9 +76,17 @@ README (a grading requirement). Never inline a prompt anywhere else.
 1. **The Commissioner** turns a sentence into a testable watcher spec, or refuses.
 2. **The Watcher** judges one fetch against the condition and returns a verdict
    with confidence, evidence and reasoning.
-3. **The Herald** writes the alert (subject + body) once a probe triggers. A
-   deterministic template is used if the model call fails, so an alert is
-   never lost to an LLM hiccup.
+3. **The Herald** writes the alert (subject + body) once a probe triggers, and
+   classifies it into a category (availability, price, release, status,
+   generic). A deterministic template is used if the model call fails, so an
+   alert is never lost to an LLM hiccup.
+
+The category selects one of five HTML email designs (`app/email_templates.py`),
+each with its own accent and badge, all in the mission-control palette. The
+templates are hardened: every dynamic value is HTML-escaped, hrefs are
+scheme-checked so a model-supplied `javascript:` link cannot render live, and
+subjects are flattened to one line so a crafted value cannot inject SMTP
+headers. Verified with live injection attempts.
 
 Alerts go out through a notification dispatcher (`app/notify.py`) so channels
 are decoupled from the trigger. Email is always on. WhatsApp (via CallMeBot,
@@ -276,4 +285,16 @@ an emailed event and exposed at `/watchers/{id}/transmissions`, so the app shows
 the alert even if the email is filtered. Added `app/notify.py` as a channel
 dispatcher with the WhatsApp channel (CallMeBot) implemented but dormant until
 its env vars are set, and a deterministic Herald template fallback so an alert
-survives an LLM failure. Next: the demo target page, then Koyeb deploy + cron.
+survives an LLM failure.
+
+**2026-07-23 (day 3, email polish).** Rebuilt the alert email. The Herald now
+classifies each alert into one of five categories, each with its own HTML
+design (`app/email_templates.py`) in the mission-control palette: availability
+(green), price and generic (amber), release (blue), status (orange). Hardened
+against injection: all values HTML-escaped, hrefs scheme-checked (a
+`javascript:` link renders as a dead `#`), and subjects flattened to defeat
+SMTP header injection. Verified with live `<script>`, `<img onerror>` and CRLF
+attacks, and by emailing one live sample of every template. Removed the double
+"Argus Mission Control" sign-off (the Herald no longer signs; the footer
+does). Real trigger to real inbox still verified end to end. Next: the demo
+target page, then Koyeb deploy + cron.
