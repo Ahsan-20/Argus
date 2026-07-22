@@ -51,10 +51,16 @@ def claim_due_watchers(db: Session) -> list[int]:
     """
     now = datetime.now(timezone.utc)
 
+    # is_demo probes (the demonstration probe) never run on the schedule; they
+    # only run when a user presses the demo button.
     if db.get_bind().dialect.name != "postgresql":
         due = (
             db.query(Watcher)
-            .filter(Watcher.status == "active", Watcher.next_run_at <= now)
+            .filter(
+                Watcher.status == "active",
+                Watcher.is_demo.is_(False),
+                Watcher.next_run_at <= now,
+            )
             .order_by(Watcher.next_run_at)
             .limit(settings.max_runs_per_tick)
             .all()
@@ -71,7 +77,8 @@ def claim_due_watchers(db: Session) -> list[int]:
                SET next_run_at = :now + (cadence_minutes || ' minutes')::interval
              WHERE id IN (
                    SELECT id FROM watchers
-                    WHERE status = 'active' AND next_run_at <= :now
+                    WHERE status = 'active' AND is_demo = false
+                      AND next_run_at <= :now
                     ORDER BY next_run_at
                     LIMIT :cap
                    FOR UPDATE SKIP LOCKED
@@ -270,14 +277,12 @@ def _trigger(db: Session, watcher: Watcher, run: Run) -> None:
 
 
 def run_due_watchers(db: Session) -> dict:
-    """Process one tick: claim due watchers and run each of them."""
-    if settings.demo_mode:
-        # Slow baseline: advance the demo cycle even when nobody is on the site,
-        # so the mission log keeps producing fresh triggers unattended.
-        from . import demo
+    """Process one tick: claim due real watchers and run each of them.
 
-        demo.advance_cycle(db)
-
+    The demonstration probe is excluded here (see claim_due_watchers); it runs
+    only on demand. The real seeded fleet plus real user watchers keep the
+    dashboard genuinely active.
+    """
     claimed = claim_due_watchers(db)
     results = []
     for watcher_id in claimed:

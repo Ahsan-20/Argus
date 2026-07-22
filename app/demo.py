@@ -1,13 +1,18 @@
-"""The demo fleet and the self-hosted demo target page.
+"""The seeded real fleet and the on-demand demonstration.
 
-Goal: the deployed site must look alive to a grader who visits unattended, with
-nobody there to press anything. So we seed a small fleet of probes and a demo
-target page whose state cycles between "slots open" and "no slots". A demo
-probe watching it therefore triggers on its own, periodically, producing a
-steady stream of real runs, verdicts, and alert emails in the mission log.
+Honesty first. Two clearly separated things live here:
 
-The demo target's state lives in the database (not on disk), so it survives
-Koyeb redeploys and is consistent across requests.
+1. A small **real fleet** of probes watching genuine public sites (Wikipedia,
+   python.org, Hacker News). These run on the normal schedule. Everything about
+   them is real: real fetches, real AI verdicts, real evidence. They exist so
+   the deployed dashboard is not empty for a grader who visits unattended.
+
+2. A single **demonstration probe** that watches a synthetic target page we
+   control. It does NOT run on the schedule. It only runs when a user presses
+   "Run a live demonstration", so they can watch a full trigger happen on
+   command (real sites rarely flip a condition while you watch). The target
+   page and the probe are both plainly labelled as a demonstration, so nothing
+   is passed off as organic real-world activity.
 """
 
 import logging
@@ -22,7 +27,8 @@ logger = logging.getLogger("argus.demo")
 settings = get_settings()
 
 DEMO_TARGET_PATH = "/demo/target"
-TARGET_TITLE = "Capital Passport Office - Appointment Availability Board"
+DEMO_CALLSIGN = "PROBE-DEMO"
+TARGET_TITLE = "Argus Demonstration Target - Appointment Availability Board"
 
 
 def demo_target_url() -> str:
@@ -37,6 +43,9 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# ---------------------------------------------------------------------------
+# Synthetic target state
+# ---------------------------------------------------------------------------
 def get_state(db: Session) -> DemoState:
     st = db.get(DemoState, 1)
     if st is None:
@@ -47,67 +56,34 @@ def get_state(db: Session) -> DemoState:
     return st
 
 
-def advance_cycle(db: Session) -> bool:
-    """Flip the demo target open/closed if a full cycle has elapsed.
-
-    Returns True if the state changed. When it closes, any demo probe that had
-    triggered is re-armed, so the next open produces a fresh trigger and the
-    demo keeps living.
-    """
+def set_slots(db: Session, count: int) -> None:
     st = get_state(db)
-    updated = st.updated_at or _now()
-    elapsed_min = (_now() - updated).total_seconds() / 60
-    if elapsed_min < settings.demo_cycle_minutes:
-        return False
-
-    if st.slots_open > 0:
-        st.slots_open = 0
-        # Re-arm triggered demo probes for the next opening.
-        for w in (
-            db.query(Watcher)
-            .filter(Watcher.is_demo.is_(True), Watcher.status == "triggered")
-            .all()
-        ):
-            if is_demo_target(w.url):
-                w.status = "active"
-                w.next_run_at = _now()
-    else:
-        st.slots_open = 3
+    st.slots_open = max(0, count)
     db.commit()
-    logger.info("demo target cycled -> slots_open=%s", st.slots_open)
-    return True
 
 
 def target_text(db: Session) -> str:
-    """The readable text a probe 'sees' when it reads the demo target.
-
-    Returned directly to the Watcher instead of doing an HTTP round trip to our
-    own URL (which the SSRF guard would block for localhost anyway). The AI
-    judging is still completely real.
-    """
+    """The readable text the demonstration probe 'sees'. Real AI judges it."""
     st = get_state(db)
     if st.slots_open > 0:
         status = (
             f"STATUS: {st.slots_open} appointment slots are OPEN for booking "
-            "right now. Eligible applicants may reserve a slot immediately "
-            "through the online portal. Slots are limited and fill quickly."
+            "right now. Eligible applicants may reserve a slot immediately."
         )
     else:
         status = (
             "STATUS: No appointment slots are currently available. All slots "
-            "for the coming period are fully booked. Please check back later, "
-            "as cancellations are released periodically."
+            "are fully booked. Please check back later."
         )
     return (
         f"{TARGET_TITLE}\n\n{status}\n\n"
-        "This board is updated automatically as availability changes. "
-        "Applicants are advised to monitor it regularly. Office hours are "
-        "Monday to Friday, 9am to 4pm. For assistance contact the help desk."
+        "This is a demonstration page used by Argus to show a watcher probe "
+        "triggering on command. Its availability is controlled by the demo "
+        "button, not by a real appointment system."
     )
 
 
 def render_target_html(db: Session) -> str:
-    """Public HTML page for the demo target (what a probe would fetch live)."""
     st = get_state(db)
     open_ = st.slots_open > 0
     color = "#1a7f37" if open_ else "#8a1c1c"
@@ -116,62 +92,101 @@ def render_target_html(db: Session) -> str:
         if open_
         else "No appointment slots are currently available"
     )
-    body = target_text(db).split("\n\n", 2)[-1]
     return (
         "<!doctype html><html><head><meta charset='utf-8'>"
         f"<title>{TARGET_TITLE}</title></head>"
         "<body style='font-family:Georgia,serif;max-width:640px;margin:40px auto;color:#222'>"
+        "<p style='background:#f3e6b3;border:1px solid #d9c56a;padding:8px 12px;"
+        "font-size:13px'>DEMONSTRATION PAGE. This target is controlled by the "
+        "Argus demo button, not a real appointment system.</p>"
         f"<h1 style='font-size:22px'>{TARGET_TITLE}</h1>"
         f"<p style='padding:14px 18px;background:{color};color:#fff;font-size:18px'>"
         f"STATUS: {banner}.</p>"
-        f"<p style='line-height:1.7'>{body}</p>"
-        f"<p style='color:#666;font-size:13px'>Last updated: {st.updated_at} UTC. "
-        "This is an Argus demonstration target: its availability cycles "
-        "automatically so watcher probes can be seen triggering.</p>"
+        "<p style='line-height:1.7'>This board simulates an appointment "
+        "availability page so an Argus probe can be seen fetching it, reasoning "
+        "about it, and triggering. The engine doing the watching is the real "
+        "product; only this target is synthetic.</p>"
+        f"<p style='color:#666;font-size:13px'>Last updated: {st.updated_at} UTC.</p>"
         "</body></html>"
     )
 
 
-def seed_fleet(db: Session) -> int:
-    """Create the demo fleet once. Idempotent: does nothing if it already exists."""
-    if db.query(Watcher).filter(Watcher.is_demo.is_(True)).count() > 0:
-        return 0
+# ---------------------------------------------------------------------------
+# Seeding
+# ---------------------------------------------------------------------------
+REAL_FLEET = [
+    {
+        "callsign": "PROBE-01",
+        "url": "https://www.python.org/downloads/",
+        "condition": "Is a stable Python 4 release available for download?",
+        "cadence_minutes": 120,
+    },
+    {
+        "callsign": "PROBE-02",
+        "url": "https://en.wikipedia.org/wiki/Pakistan",
+        "condition": "Does the page state that Islamabad is the capital of Pakistan?",
+        "cadence_minutes": 180,
+    },
+    {
+        "callsign": "PROBE-03",
+        "url": "https://news.ycombinator.com",
+        "condition": "Does any front page story mention AI or a language model?",
+        "cadence_minutes": 60,
+    },
+]
 
+
+def ensure_real_fleet(db: Session) -> int:
+    """Create the real seeded probes if missing. Idempotent."""
     email = settings.owner_email or "demo@example.com"
-    now = _now()
-    fleet = [
-        Watcher(
-            callsign="PROBE-DEMO-1",
-            url=demo_target_url(),
-            condition="Are appointment slots currently available for booking?",
-            cadence_minutes=15,
-            email=email,
-            status="active",
-            is_demo=True,
-            next_run_at=now,
-        ),
-        Watcher(
-            callsign="PROBE-DEMO-2",
-            url="https://en.wikipedia.org/wiki/Pakistan",
-            condition="Does the page state that Islamabad is the capital of Pakistan?",
-            cadence_minutes=180,
-            email=email,
-            status="active",
-            is_demo=True,
-            next_run_at=now,
-        ),
-        Watcher(
-            callsign="PROBE-DEMO-3",
-            url="https://www.python.org/downloads/",
-            condition="Is a stable Python 4 release available for download?",
-            cadence_minutes=180,
-            email=email,
-            status="active",
-            is_demo=True,
-            next_run_at=now,
-        ),
-    ]
-    db.add_all(fleet)
+    created = 0
+    for spec in REAL_FLEET:
+        exists = (
+            db.query(Watcher).filter(Watcher.callsign == spec["callsign"]).count() > 0
+        )
+        if exists:
+            continue
+        db.add(
+            Watcher(
+                callsign=spec["callsign"],
+                url=spec["url"],
+                condition=spec["condition"],
+                cadence_minutes=spec["cadence_minutes"],
+                email=email,
+                status="active",
+                is_demo=False,  # real probes run on the normal schedule
+                next_run_at=_now(),
+            )
+        )
+        created += 1
+    if created:
+        db.commit()
+        logger.info("seeded %d real probes", created)
+    return created
+
+
+def ensure_demo_probe(db: Session) -> Watcher:
+    """The single demonstration probe, at rest until the button is pressed."""
+    probe = db.query(Watcher).filter(Watcher.callsign == DEMO_CALLSIGN).first()
+    if probe is not None:
+        # Self-correct the display URL if the deploy base URL changed.
+        wanted = demo_target_url()
+        if probe.url != wanted:
+            probe.url = wanted
+            db.commit()
+        return probe
+
+    probe = Watcher(
+        callsign=DEMO_CALLSIGN,
+        url=demo_target_url(),
+        condition="Are appointment slots currently available for booking?",
+        cadence_minutes=60,
+        email=settings.owner_email or "demo@example.com",
+        status="standby",  # excluded from the scheduler; runs only on demand
+        is_demo=True,
+        next_run_at=_now(),
+    )
+    db.add(probe)
     db.commit()
-    logger.info("seeded demo fleet: %d probes", len(fleet))
-    return len(fleet)
+    db.refresh(probe)
+    return probe

@@ -21,12 +21,14 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    # Seed the demo fleet once so the deployed site is never empty.
+    # Seed the real fleet (genuine sites) and the on-demand demonstration probe
+    # so the deployed dashboard is populated and ready.
     if settings.demo_mode:
         from . import demo
 
         with SessionLocal() as db:
-            demo.seed_fleet(db)
+            demo.ensure_real_fleet(db)
+            demo.ensure_demo_probe(db)
     yield
 
 

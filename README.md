@@ -35,9 +35,10 @@ Working:
 - Watcher management: create, confirm, list, get, pause, resume, retire
 - SSRF guard enforced at watcher creation, redirects re-validated per hop
 - **Access gate**: the whole watcher API sits behind a shared access code
-- **Self-running demo fleet**: seeded probes plus a demo target page whose
-  state cycles automatically, so the deployed site looks alive to a grader who
-  visits unattended
+- **Real seeded fleet**: 3 probes watching genuine sites (python.org,
+  Wikipedia, Hacker News) so the deployed dashboard is populated and honest
+- **On-demand demonstration**: a single labelled demo probe that fires only
+  when a user presses "Run a live demonstration", against a synthetic target
 
 Next: deploy to Koyeb + cron, then the React frontend on Vercel.
 
@@ -155,13 +156,12 @@ committed. See `.env.example` for guidance on each.
 | POST | `/watchers/{id}/resume` | Resume, re-arms a triggered probe |
 | DELETE | `/watchers/{id}` | Retire |
 | POST | `/tick` | Cron heartbeat, requires `X-Tick-Secret` |
-| GET | `/demo/target` | Public demo page a probe watches; state cycles |
-| POST | `/demo/pulse` | Presence ping: advance demo + run its probes now |
-| POST | `/demo/seed` | Seed the demo fleet (idempotent) |
+| GET | `/demo/target` | Public, clearly-labelled demonstration page |
+| POST | `/demo/run` | Run one live demonstration on demand |
 
 The watcher endpoints require the `X-Access-Code` header when `ACCESS_CODE` is
 set. `/demo/target` is always public (a probe, and a grader, must be able to
-read it); the demo write endpoints require the code.
+read it); `/demo/run` requires the code.
 
 Creating a probe is deliberately two steps so the user sees exactly what the
 agent understood before anything is stored.
@@ -184,12 +184,14 @@ agent understood before anything is stored.
   The code matters because the repo is public and the live URL ends up in it,
   so the URL is effectively public and obscurity is not protection. Even if the
   code leaks, `MAX_ACTIVE_WATCHERS` and the daily LLM budget bound the damage.
-- **The demo fleet is self-running.** A grader visits unattended, so the demo
-  target page cycles its own state (`DEMO_CYCLE_MINUTES`) and a seeded probe
-  triggers on its own. Presence based: opening the site pulses the demo so it
-  looks alive right then; a slow cron baseline keeps it fresh otherwise. Demo
-  probe alerts are recorded and shown in-app but NOT emailed, so they do not
-  spam the owner inbox or burn the Gmail quota every cycle.
+- **Honesty of the demo (important).** The always-on fleet watches only real
+  sites, so nothing in the background is simulated or passed off as organic
+  activity. The one synthetic piece, an appointment-availability target, is
+  watched by a single demo probe that runs ONLY when a user presses "Run a
+  live demonstration". Both the target page and that probe are labelled as a
+  demonstration. So the engine is entirely real; only an explicitly
+  user-initiated, clearly-marked target is synthetic. The demonstration alert
+  is shown in-app, never emailed.
 - **Two-step watcher creation** so the parsed spec is always confirmed by a
   human before an agent goes live.
 
@@ -336,5 +338,18 @@ baseline. Demo alerts are recorded and shown in-app but not emailed, so they do
 not spam the owner inbox every cycle. The demo target is read straight from its
 DB state (the SSRF guard would block an HTTP call to our own localhost URL, and
 this avoids the round trip while keeping the AI judging real). 14/14 demo
-checks pass, 17/17 core audit still green. Next: Koyeb deploy + cron, then the
-React frontend.
+checks pass, 17/17 core audit still green.
+
+**2026-07-23 (day 3, honest-hybrid demo).** Reworked the demo for integrity
+after a good question: was the auto-cycling demo a lie? Now the always-on fleet
+watches only REAL sites (python.org, Wikipedia, Hacker News), so nothing in the
+background is simulated. The synthetic appointment target is watched by a
+single demo probe held in `standby` and excluded from the scheduler; it fires
+only on `POST /demo/run` (the "Run a live demonstration" button), then resets
+itself so it is repeatable. Both the target and the probe are labelled a
+demonstration; the alert is shown in-app, never emailed. Also hardened startup:
+a crashed local test left a session idle-in-transaction holding a lock, which
+made `ALTER TABLE` in startup hang; the migration now sets a `lock_timeout` and
+skips rather than hanging (production closes sessions cleanly via get_db, so it
+never causes this itself). 10/10 hybrid checks pass. Next: Koyeb deploy + cron,
+then the React frontend with the demo button.

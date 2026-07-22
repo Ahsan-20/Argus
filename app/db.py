@@ -4,7 +4,10 @@ Falls back to a local SQLite file when DATABASE_URL is empty so the app can
 boot on a fresh clone before Supabase is wired up.
 """
 
+import logging
+
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import get_settings
@@ -71,5 +74,16 @@ def _ensure_columns() -> None:
     if engine.dialect.name != "postgresql":
         return  # the SQLite dev fallback is always created fresh
     with engine.begin() as conn:
+        # Fail fast instead of hanging startup if some other session holds a
+        # lock: the column almost certainly already exists, so a skipped ALTER
+        # is harmless and the app still boots.
+        conn.execute(text("SET lock_timeout = '4000'"))
         for stmt in _ADDED_COLUMNS:
-            conn.execute(text(stmt))
+            try:
+                conn.execute(text(stmt))
+            except OperationalError as exc:
+                logging.getLogger("argus.db").warning(
+                    "skipped migration (lock or timeout): %s", exc
+                )
+                conn.rollback()
+                break
