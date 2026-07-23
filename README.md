@@ -403,3 +403,14 @@ block (surfacing the extracted data point), evidence quote, and CTA. Kept the
 injection hardening and added tests for it; 24 committed unit tests pass. Sent
 one live sample of every category to confirm delivery. Pre-deploy note: reset
 the Supabase tables so seeded callsigns start clean (test churn pushed ids up).
+
+**2026-07-24 (email fix + redesign).** Fixed the logo not rendering: Gmail
+strips `data:` image URLs, so the logo is now an inline CID attachment
+(multipart/related), which clients render. Then rebuilt the alert email to stop
+looking like a generic SaaS card and commit to the Deep Space Mission Control
+brand: near-black console panel, a single amber accent with verdict green used
+once for the status line, hairline borders, monospace telemetry, `// SECTION`
+markers, a `KEY : value` TELEMETRY readout (probe, confidence, tracked value,
+target, class), an EVIDENCE quote, and an outline monospace CTA rather than a
+solid rounded button. Data-dense and left-aligned, not soft and centred. 25
+committed unit tests pass. Added GET /logo.png to serve the mark.

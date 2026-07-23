@@ -38,13 +38,28 @@ def test_img_onerror_is_escaped():
 def test_tracked_value_is_escaped_and_shown():
     html = _render(tracked_label="the price", tracked_value="<b>$5</b>")
     assert "&lt;b&gt;$5&lt;/b&gt;" in html
-    assert "Tracking" in html
+    assert "// TELEMETRY" in html
 
 
 def test_javascript_href_is_neutralised():
     html = _render(url="javascript:alert(3)")
     assert "javascript:alert" not in html
     assert 'href="#"' in html
+
+
+def test_telemetry_and_sections_present():
+    html = _render(
+        confidence=88,
+        tracked_label="the price",
+        tracked_value="$479",
+        stamp="2026-07-24 20:00 UTC",
+    )
+    assert "// TELEMETRY" in html
+    assert "// EVIDENCE" in html
+    assert "OPEN TARGET" in html
+    assert "88%" in html
+    assert "$479" in html
+    assert "REPORTING" in html
 
 
 def test_http_href_survives():
@@ -65,7 +80,7 @@ def test_category_coercion():
     assert category_of("") == "generic"
 
 
-def test_every_category_renders_with_its_accent():
+def test_every_category_renders_with_its_status():
     for cat, cfg in CATEGORIES.items():
         html = render_alert_html(
             category=cat,
@@ -75,6 +90,6 @@ def test_every_category_renders_with_its_accent():
             evidence="e",
             url="https://example.com",
         )
-        assert cfg["accent"] in html
-        assert cfg["label"] in html
-        assert "Open target" in html
+        assert cfg["label"] in html   # CLASS metadata
+        assert cfg["status"] in html  # status line
+        assert "OPEN TARGET" in html

@@ -253,6 +253,8 @@ def _trigger(db: Session, watcher: Watcher, run: Run) -> None:
         url=watcher.url,
         tracked_label=watcher.track,
         tracked_value=run.extracted,
+        confidence=run.confidence,
+        stamp=run.started_at.strftime("%Y-%m-%d %H:%M UTC") if run.started_at else None,
     )
     if watcher.is_demo:
         # Demo probes re-trigger every cycle around the clock. Recording the

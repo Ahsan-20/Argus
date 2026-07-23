@@ -1,4 +1,10 @@
-"""HTML alert templates, one visual style per alert category.
+"""HTML alert emails, styled as a mission-control transmission.
+
+Deep Space Mission Control brand: near-black, a single phosphor-amber accent
+with verdict-green used sparingly, thin hairline borders, monospace for all
+telemetry and labels, and a terse mission-control voice. The layout is a
+data-dense dossier (console header, status line, telemetry readout, evidence
+quote, outline CTA), deliberately NOT a soft centred SaaS card.
 
 Security first: every dynamic value is HTML-escaped, hrefs are scheme-checked
 so a model-supplied "javascript:" URL can never render as a live link, and
@@ -12,21 +18,30 @@ from urllib.parse import urlparse
 
 from .branding import LOGO_CID
 
-# Category -> visual identity. Amber is the house accent; green signals "go".
+# Category is metadata only. The brand uses one accent (amber); the verdict is
+# signalled in green. No per-category rainbow, which reads more disciplined.
 CATEGORIES: dict[str, dict[str, str]] = {
-    "availability": {"accent": "#3DDC84", "label": "AVAILABILITY", "tag": "Now available"},
-    "price": {"accent": "#FFB000", "label": "PRICE", "tag": "Price change"},
-    "release": {"accent": "#38BDF8", "label": "RELEASE", "tag": "New release"},
-    "status": {"accent": "#F5A524", "label": "STATUS", "tag": "Status change"},
-    "generic": {"accent": "#FFB000", "label": "ALERT", "tag": "Condition met"},
+    "availability": {"label": "AVAILABILITY", "status": "NOW AVAILABLE"},
+    "price": {"label": "PRICE", "status": "PRICE CHANGE DETECTED"},
+    "release": {"label": "RELEASE", "status": "NEW RELEASE DETECTED"},
+    "status": {"label": "STATUS", "status": "STATUS CHANGE DETECTED"},
+    "generic": {"label": "ALERT", "status": "CONDITION MET"},
 }
 FALLBACK = "generic"
 
-INK = "#0B0E1A"
-INK_2 = "#10152a"
-LINE = "#1c2233"
-TEXT = "#c9d1e3"
-MUTE = "#6b7488"
+# Palette
+PAGE = "#05070d"      # outer background
+CARD = "#0B0E1A"      # console body
+LINE = "#20263a"      # hairline
+PANEL = "#0e1424"     # inset panels
+AMBER = "#FFB000"     # the one accent
+GREEN = "#3DDC84"     # verdict / positive, used sparingly
+WHITE = "#f4f7ff"
+TEXT = "#c2cae0"
+MUTE = "#616b86"
+
+MONO = "'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace"
+DISP = "'Space Grotesk','Helvetica Neue',Helvetica,Arial,sans-serif"
 
 
 def category_of(value: str | None) -> str:
@@ -54,70 +69,39 @@ def _body_html(body: str) -> str:
     parts = []
     for block in blocks:
         parts.append(
-            '<p style="margin:0 0 14px;color:%s;font-size:14px;line-height:1.7">%s</p>'
-            % (TEXT, _esc(block).replace("\n", "<br>"))
+            f'<p style="margin:0 0 12px;color:{TEXT};font-family:{DISP};'
+            f'font-size:15px;line-height:1.65">{_esc(block).replace(chr(10), "<br>")}</p>'
         )
     return "".join(parts) or (
-        '<p style="margin:0 0 14px;color:%s">Your watched condition is now met.</p>'
-        % TEXT
+        f'<p style="margin:0;color:{TEXT};font-family:{DISP};font-size:15px">'
+        "Your watched condition is now met.</p>"
     )
 
 
-MONO = "'Courier New',monospace"
-SANS = "Arial,Helvetica,sans-serif"
-
-
-def _header(accent: str, callsign: str) -> str:
-    """Logo emblem + ARGUS wordmark + callsign, as an email-safe table row."""
+def _label(text: str) -> str:
+    """A `// SECTION` marker in amber monospace."""
     return (
-        '<tr><td style="padding:24px 28px 0">'
-        '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
-        f'<td style="padding-right:14px;vertical-align:middle">'
-        f'<img src="cid:{LOGO_CID}" width="40" height="40" alt="Argus" '
-        'style="display:block;border:0"></td>'
-        '<td style="vertical-align:middle">'
-        f'<div style="color:#ffffff;font-family:{SANS};font-size:18px;'
-        'font-weight:bold;letter-spacing:3px;line-height:1">ARGUS</div>'
-        f'<div style="color:{MUTE};font-family:{MONO};font-size:10px;'
-        f'letter-spacing:2px;margin-top:3px">MISSION CONTROL &nbsp;//&nbsp; '
-        f'{_esc(callsign)}</div>'
-        '</td></tr></table></td></tr>'
+        f'<div style="color:{AMBER};font-family:{MONO};font-size:11px;'
+        f'letter-spacing:2px;font-weight:bold">// {_esc(text)}</div>'
     )
 
 
-def _pill(accent: str, label: str) -> str:
-    return (
-        '<tr><td style="padding:18px 28px 0">'
-        f'<span style="display:inline-block;background:{INK_2};color:{accent};'
-        f'border:1px solid {accent};border-radius:999px;padding:4px 13px;'
-        f'font-family:{MONO};font-size:11px;letter-spacing:1px">'
-        f'&#9679; {_esc(label)}</span></td></tr>'
-    )
-
-
-def _tracked_block(accent: str, label: str, value: str) -> str:
-    return (
-        '<tr><td style="padding:16px 28px 0">'
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
-        f'<td style="background:{INK_2};border:1px solid {LINE};border-radius:8px;'
-        'padding:12px 16px">'
-        f'<div style="color:{MUTE};font-family:{MONO};font-size:10px;'
-        f'letter-spacing:1px;text-transform:uppercase">Tracking &middot; {_esc(label)}</div>'
-        f'<div style="color:{accent};font-family:{MONO};font-size:22px;'
-        f'font-weight:bold;margin-top:4px">{_esc(value)}</div>'
-        '</td></tr></table></td></tr>'
-    )
-
-
-def _evidence_block(accent: str, evidence: str) -> str:
-    return (
-        '<tr><td style="padding:16px 28px 0">'
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
-        f'<td style="border-left:3px solid {accent};background:{INK_2};'
-        f'padding:10px 16px;color:#aeb8cc;font-family:{MONO};font-size:13px;'
-        f'line-height:1.6">&ldquo;{_esc(evidence.strip())}&rdquo;</td>'
-        '</tr></table></td></tr>'
-    )
+def _telemetry_rows(rows: list[tuple[str, str, bool]]) -> str:
+    """rows: list of (label, value, highlight). Rendered as key:value lines."""
+    out = []
+    for i, (label, value, highlight) in enumerate(rows):
+        border = "" if i == 0 else f"border-top:1px solid {LINE};"
+        val_color = AMBER if highlight else WHITE
+        val_size = "15px" if highlight else "13px"
+        out.append(
+            f'<tr><td style="{border}padding:9px 14px;font-family:{MONO};'
+            f'font-size:11px;letter-spacing:1px;color:{MUTE};'
+            f'white-space:nowrap;vertical-align:middle">{_esc(label)}</td>'
+            f'<td style="{border}padding:9px 14px;font-family:{MONO};'
+            f'font-size:{val_size};color:{val_color};text-align:right;'
+            f'vertical-align:middle;word-break:break-all">{_esc(value)}</td></tr>'
+        )
+    return "".join(out)
 
 
 def render_alert_html(
@@ -130,43 +114,111 @@ def render_alert_html(
     url: str,
     tracked_label: str | None = None,
     tracked_value: str | None = None,
+    confidence: int | None = None,
+    stamp: str | None = None,
 ) -> str:
-    """Build a self-contained, injection-safe, branded HTML alert."""
+    """Build a self-contained, injection-safe mission-control alert email."""
     cat = CATEGORIES[category_of(category)]
-    accent = cat["accent"]
     href = _safe_href(url)
+    # http(s) only reaches real watchers; fall back to a neutral label rather
+    # than echoing an unexpected scheme into the telemetry readout.
+    host = urlparse(url).hostname or "target"
+    stamp = stamp or "--"
 
-    tracked = ""
+    # Telemetry readout rows.
+    rows: list[tuple[str, str, bool]] = [("PROBE", callsign, False)]
+    if confidence is not None:
+        rows.append(("CONFIDENCE", f"{confidence}%", False))
     if tracked_label and tracked_value and tracked_value.strip():
-        tracked = _tracked_block(accent, tracked_label, tracked_value)
-    evidence_html = _evidence_block(accent, evidence) if (evidence or "").strip() else ""
+        rows.append((tracked_label.upper()[:40], tracked_value.strip(), True))
+    rows.append(("TARGET", host, False))
+    rows.append(("CLASS", cat["label"], False))
+
+    evidence_section = ""
+    if (evidence or "").strip():
+        evidence_section = (
+            f'<tr><td style="padding:22px 30px 0">{_label("EVIDENCE")}'
+            f'<div style="margin-top:10px;border:1px solid {LINE};'
+            f'border-left:3px solid {AMBER};background:{PANEL};padding:12px 16px;'
+            f'font-family:{MONO};font-size:13px;line-height:1.6;color:#aeb8cc">'
+            f'&ldquo;{_esc(evidence.strip())}&rdquo;</div></td></tr>'
+        )
 
     parts = [
-        '<div style="background:#05070f;padding:24px 12px;margin:0">',
+        f'<div style="background:{PAGE};padding:28px 12px;margin:0">',
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">',
         '<tr><td align="center">',
         '<table role="presentation" width="600" cellpadding="0" cellspacing="0" '
-        f'style="max-width:600px;width:100%;background:{INK};border:1px solid {LINE};'
-        'border-radius:14px;overflow:hidden">',
-        f'<tr><td style="height:4px;background:{accent};line-height:4px;font-size:0">'
+        f'style="max-width:600px;width:100%;background:{CARD};border:1px solid {LINE}">',
+
+        # top amber rule
+        f'<tr><td style="height:3px;background:{AMBER};line-height:3px;font-size:0">'
         '&nbsp;</td></tr>',
-        _header(accent, callsign),
-        _pill(accent, cat["label"]),
-        '<tr><td style="padding:14px 28px 0">'
-        f'<h1 style="margin:0;color:#ffffff;font-family:{SANS};font-size:21px;'
-        f'line-height:1.35">{_esc(subject)}</h1></td></tr>',
-        f'<tr><td style="padding:14px 28px 0">{_body_html(body)}</td></tr>',
-        tracked,
-        evidence_html,
-        '<tr><td style="padding:24px 28px 8px">'
-        f'<a href="{href}" style="display:inline-block;background:{accent};'
-        f'color:#06110a;text-decoration:none;font-family:{SANS};font-weight:bold;'
-        'font-size:14px;padding:13px 26px;border-radius:7px">Open target &rarr;</a>'
-        '</td></tr>',
-        '<tr><td style="padding:22px 28px;border-top:1px solid '
-        f'{LINE};color:{MUTE};font-family:{MONO};font-size:11px;line-height:1.6">'
-        'Argus Mission Control &middot; automated watch report<br>'
-        'You are receiving this because you launched this probe.</td></tr>',
+
+        # console header: logo + wordmark ........ // PROBE REPORT
+        '<tr><td style="padding:22px 30px 16px">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+        f'<td width="40" style="vertical-align:middle">'
+        f'<img src="cid:{LOGO_CID}" width="34" height="34" alt="Argus" '
+        'style="display:block;border:0"></td>'
+        '<td style="vertical-align:middle;padding-left:12px">'
+        f'<div style="color:{WHITE};font-family:{DISP};font-size:16px;'
+        'font-weight:700;letter-spacing:4px;line-height:1">ARGUS</div>'
+        f'<div style="color:{MUTE};font-family:{MONO};font-size:9px;'
+        'letter-spacing:3px;margin-top:3px">MISSION CONTROL</div></td>'
+        f'<td style="vertical-align:middle;text-align:right;color:{MUTE};'
+        f'font-family:{MONO};font-size:10px;letter-spacing:2px">// PROBE REPORT</td>'
+        '</tr></table></td></tr>',
+
+        # hairline
+        f'<tr><td style="padding:0 30px"><div style="border-top:1px solid {LINE}">'
+        '</div></td></tr>',
+
+        # transmission line
+        f'<tr><td style="padding:16px 30px 0;color:{MUTE};font-family:{MONO};'
+        f'font-size:11px;letter-spacing:1px">{_esc(callsign)} REPORTING '
+        f'&middot; {_esc(stamp)}</td></tr>',
+
+        # status line (verdict green, left rule)
+        '<tr><td style="padding:12px 30px 0">'
+        f'<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
+        f'<td style="border-left:3px solid {GREEN};padding:2px 0 2px 12px;'
+        f'color:{GREEN};font-family:{MONO};font-size:15px;font-weight:bold;'
+        f'letter-spacing:2px">&#9679; {_esc(cat["status"])}</td>'
+        '</tr></table></td></tr>',
+
+        # subject
+        f'<tr><td style="padding:16px 30px 0"><h1 style="margin:0;color:{WHITE};'
+        f'font-family:{DISP};font-size:22px;font-weight:700;line-height:1.3">'
+        f'{_esc(subject)}</h1></td></tr>',
+
+        # body
+        f'<tr><td style="padding:14px 30px 0">{_body_html(body)}</td></tr>',
+
+        # telemetry
+        f'<tr><td style="padding:22px 30px 0">{_label("TELEMETRY")}'
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        f'style="margin-top:10px;border:1px solid {LINE};background:{PANEL}">'
+        f'{_telemetry_rows(rows)}</table></td></tr>',
+
+        # evidence
+        evidence_section,
+
+        # CTA: outline button, monospace
+        '<tr><td style="padding:26px 30px 6px">'
+        f'<a href="{href}" style="display:inline-block;border:1px solid {AMBER};'
+        f'color:{AMBER};text-decoration:none;font-family:{MONO};font-size:13px;'
+        'font-weight:bold;letter-spacing:2px;padding:12px 22px">'
+        'OPEN TARGET &nbsp;&rarr;</a></td></tr>',
+
+        # footer
+        f'<tr><td style="padding:24px 30px;margin-top:6px">'
+        f'<div style="border-top:1px solid {LINE};padding-top:16px;color:{MUTE};'
+        f'font-family:{MONO};font-size:10px;letter-spacing:1px;line-height:1.7">'
+        'ARGUS MISSION CONTROL &middot; AUTOMATED WATCH REPORT<br>'
+        'You are receiving this transmission because you launched this probe.'
+        '</div></td></tr>',
+
         '</table></td></tr></table></div>',
     ]
     return "".join(parts)
