@@ -27,8 +27,18 @@ def test_script_tag_is_escaped():
 
 def test_img_onerror_is_escaped():
     html = _render(body="<img src=x onerror=alert(2)>")
-    assert "<img" not in html
+    # The injected tag must be escaped (inert)...
     assert "&lt;img" in html
+    assert "<img src=x onerror" not in html
+    # ...while the only live <img> is our own logo, a static data URI.
+    assert html.count("<img") == 1
+    assert 'src="data:image/png;base64,' in html
+
+
+def test_tracked_value_is_escaped_and_shown():
+    html = _render(tracked_label="the price", tracked_value="<b>$5</b>")
+    assert "&lt;b&gt;$5&lt;/b&gt;" in html
+    assert "Tracking" in html
 
 
 def test_javascript_href_is_neutralised():

@@ -75,6 +75,9 @@ cron -> POST /tick -> claim due watchers (atomic)
 | `app/mailer.py` | SMTP alert delivery |
 | `app/notify.py` | Channel dispatcher: email now, WhatsApp when enabled |
 | `app/email_templates.py` | Injection-safe HTML alerts, one style per category |
+| `app/branding.py` | Generated logo data-URI embedded in emails |
+| `tools/gen_logo.py` | Logo asset generator (dev only, needs Pillow) |
+| `assets/` | Logo PNGs (mark, app tile, email) |
 | `app/demo.py` | Demo target page, auto-cycle, seed fleet |
 | `app/deps.py` | Shared access-code dependency |
 | `app/routers/watchers.py` | Commissioner flow and fleet management |
@@ -387,3 +390,16 @@ does a real DB round trip, and a committed pytest suite (23 tests, no keys or
 network: SSRF, email injection, category selection, header injection, parsing).
 23 unit + 17 core audit + 6 live tracking checks all green. Next: Koyeb deploy
 + cron, then the React frontend.
+
+**2026-07-24 (local recheck, logo, email redesign).** Ran the real uvicorn
+server and walked the whole API over live HTTP (22/22): Commissioner parse with
+tracking, confirm, run-now with extraction, mission log, pause/resume, demo
+target, on-demand demonstration, and the /tick heartbeat. Designed and added an
+Argus logo (an all-seeing almond eye in an orbital ring with a probe; amber on
+dark) via a committed generator (`tools/gen_logo.py` -> `assets/` +
+`app/branding.py` data-URI, so the runtime needs no image library). Rebuilt the
+alert email around it: logo header, category pill, a highlighted tracked-value
+block (surfacing the extracted data point), evidence quote, and CTA. Kept the
+injection hardening and added tests for it; 24 committed unit tests pass. Sent
+one live sample of every category to confirm delivery. Pre-deploy note: reset
+the Supabase tables so seeded callsigns start clean (test churn pushed ids up).

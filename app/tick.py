@@ -251,6 +251,8 @@ def _trigger(db: Session, watcher: Watcher, run: Run) -> None:
         body=alert["body"],
         evidence=run.evidence,
         url=watcher.url,
+        tracked_label=watcher.track,
+        tracked_value=run.extracted,
     )
     if watcher.is_demo:
         # Demo probes re-trigger every cycle around the clock. Recording the
