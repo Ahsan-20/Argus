@@ -10,7 +10,7 @@ reliably.
 import html
 from urllib.parse import urlparse
 
-from .branding import LOGO_DATA_URI
+from .branding import LOGO_CID
 
 # Category -> visual identity. Amber is the house accent; green signals "go".
 CATEGORIES: dict[str, dict[str, str]] = {
@@ -73,7 +73,7 @@ def _header(accent: str, callsign: str) -> str:
         '<tr><td style="padding:24px 28px 0">'
         '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
         f'<td style="padding-right:14px;vertical-align:middle">'
-        f'<img src="{LOGO_DATA_URI}" width="40" height="40" alt="Argus" '
+        f'<img src="cid:{LOGO_CID}" width="40" height="40" alt="Argus" '
         'style="display:block;border:0"></td>'
         '<td style="vertical-align:middle">'
         f'<div style="color:#ffffff;font-family:{SANS};font-size:18px;'

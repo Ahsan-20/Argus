@@ -30,9 +30,9 @@ def test_img_onerror_is_escaped():
     # The injected tag must be escaped (inert)...
     assert "&lt;img" in html
     assert "<img src=x onerror" not in html
-    # ...while the only live <img> is our own logo, a static data URI.
+    # ...while the only live <img> is our own logo, referenced by cid.
     assert html.count("<img") == 1
-    assert 'src="data:image/png;base64,' in html
+    assert 'src="cid:argus-logo"' in html
 
 
 def test_tracked_value_is_escaped_and_shown():

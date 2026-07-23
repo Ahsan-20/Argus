@@ -3,7 +3,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
@@ -48,6 +48,17 @@ app.add_middleware(
 # graders) can read it.
 app.include_router(watchers.router, dependencies=[Depends(require_access)])
 app.include_router(demo_router.router)
+
+
+@app.get("/logo.png")
+def logo() -> Response:
+    """Serve the brand mark. Handy for the frontend and README."""
+    import base64
+
+    from .branding import LOGO_DATA_URI
+
+    data = base64.b64decode(LOGO_DATA_URI.split(",", 1)[1])
+    return Response(content=data, media_type="image/png")
 
 
 @app.get("/health")

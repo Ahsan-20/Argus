@@ -5,13 +5,20 @@ set on their watcher, so notifications actually reach the intended person (no
 verified domain needed). Every sent alert is also rendered inside the app.
 """
 
+import base64
 import smtplib
 import ssl
 from email.message import EmailMessage
 
+from .branding import LOGO_CID, LOGO_DATA_URI
 from .config import get_settings
 
 settings = get_settings()
+
+# Raw logo bytes, embedded inline as a CID attachment. Email clients (Gmail in
+# particular) strip `data:` image URLs, so the logo must be a real attached
+# part referenced by `cid:` to actually render in a received email.
+_LOGO_BYTES = base64.b64decode(LOGO_DATA_URI.split(",", 1)[1])
 
 
 def _one_line(value: str) -> str:
@@ -50,6 +57,11 @@ def send_alert(
     msg.set_content(body)  # plain-text part
     if html:
         msg.add_alternative(html, subtype="html")  # preferred part
+        # Attach the logo inline, related to the HTML part, referenced by cid.
+        html_part = msg.get_payload()[1]
+        html_part.add_related(
+            _LOGO_BYTES, maintype="image", subtype="png", cid=LOGO_CID
+        )
 
     _send(msg)
     return {"sent": True, "to": recipient, "subject": subject, "body": body}
