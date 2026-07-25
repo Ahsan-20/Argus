@@ -430,6 +430,20 @@ Any host that runs a long-lived Python process, or the included `Dockerfile`.
 Not a serverless runtime: the scheduler lives in the process and a check takes
 several seconds.
 
+**Check the host's outbound SMTP policy before choosing one.** Providers
+commonly block ports 25, 465 and 587 to stop their address ranges being used
+for spam, and a blocked port does not refuse the connection, it swallows it, so
+mail simply never arrives and nothing in the logs says why. Render's free tier
+blocks all three; Koyeb blocks 25 and recommends 587. Set `SMTP_PORT` to a port
+the host actually permits.
+
+Where SMTP is unavailable, set `BREVO_API_KEY` and mail goes over an HTTP API on
+443 instead. That works anywhere, at the cost of deliverability: mail sent by a
+third party claiming to be from a Gmail address fails SPF and DKIM alignment and
+is more likely to be filtered as spam. Sending through the mailbox's own
+provider avoids that, which is a good reason to prefer a host that permits
+SMTP.
+
 ```
 Build:   pip install -r requirements.txt
 Start:   uvicorn app.main:app --host 0.0.0.0 --port $PORT
