@@ -4,8 +4,10 @@ The FastAPI service behind Argus. It stores the watchers, keeps their schedule,
 fetches the pages, asks the AI whether the thing you were waiting for has
 happened, and sends the email when it has.
 
-The React client is in [`../frontend`](../frontend). The project overview, live
-URL, screenshots and the full system prompts are in the
+**Live:** https://argus-xv4m.onrender.com
+
+The React client is in [`../frontend`](../frontend). The project overview,
+screenshots and the full system prompts are in the
 [root README](../README.md).
 
 **Stack:** Python 3.12, FastAPI, SQLAlchemy 2, Postgres, Google Gemini with a
@@ -18,7 +20,7 @@ Groq fallback, SMTP.
 ```mermaid
 flowchart TB
     BROWSER["Browser<br/>React client"]
-    MONITOR["Uptime monitor<br/>GET /health every 5 min<br/>keeps a free instance awake"]
+    MONITOR["Uptime monitor<br/>GET or HEAD /health<br/>keeps a free instance awake"]
 
     subgraph APP["FastAPI application"]
         direction TB
@@ -65,7 +67,7 @@ flowchart TB
 | `routers/accounts.py` | 353 | Signup, signin, verification, password reset |
 | `demo.py` | 319 | Starter watchers, first account, demo target page |
 | `prompts.py` | 271 | The three system prompts and their JSON schemas |
-| `main.py` | 221 | App wiring, `/health`, `/stats`, `/tick` |
+| `main.py` | 272 | App wiring, `/`, `/health`, `/stats`, `/tick` |
 | `models.py` | 207 | Six SQLAlchemy tables |
 | `auth.py` | 171 | Password hashing and signed tokens |
 | `llm.py` | 159 | Provider fallback, JSON-shaped output, budget |
@@ -285,8 +287,8 @@ stored.
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| GET | `/` | none | What this service is, and where the app lives. Exists so the bare domain answers instead of returning 404, which also lets an uptime monitor point at it truthfully |
-| GET | `/health` | none | Liveness plus a real database round trip |
+| GET, HEAD | `/` | none | What this service is, and where the app lives. Exists so the bare domain answers instead of returning 404, which also lets an uptime monitor point at it truthfully |
+| GET, HEAD | `/health` | none | Liveness plus a real database round trip |
 | GET | `/stats` | optional | Counts, plus a `mine` block when signed in |
 | POST | `/pulse` | none | Presence beacon, wakes a sleeping instance |
 | POST | `/tick` | `X-Tick-Secret` | Manual or external trigger for a scheduler pass |
@@ -435,9 +437,18 @@ Health:  /health
 ```
 
 Set every required variable from the configuration section. On a host that
-sleeps when idle, point an uptime monitor at `/health` every 5 minutes, as a
-keyword monitor expecting `"status":"ok"` rather than a plain status check, since
-`/health` returns `200` with `"degraded"` when the database is unreachable.
+sleeps when idle, point an uptime monitor at `/` or `/health` every 5 minutes.
+
+Prefer a keyword monitor expecting `"status":"ok"` over a plain status check,
+because `/health` returns `200` with `"degraded"` when the database is
+unreachable, and a code-only check would call that healthy.
+
+Both paths accept **GET and HEAD**. That matters: monitors commonly probe with
+HEAD to save bandwidth, and FastAPI's `@app.get` registers GET alone, unlike
+plain Starlette. A GET-only endpoint answers a HEAD probe with `405 Method Not
+Allowed`, and the monitor reports the service as down while it is serving
+traffic perfectly well. It is a confusing failure to diagnose, because the
+monitor keeps recording healthy response times throughout.
 
 If the instance is asleep when a ping lands, the ping wakes it and the scheduler
 catches up on everything that fell due, because the schedule is stored in the

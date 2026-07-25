@@ -583,7 +583,7 @@ physically cannot return a shape the rest of the code does not expect.
 | **Google AI Studio** | Gemini API |
 | **Groq** | Fallback inference |
 | **Gmail SMTP** | Email delivery |
-| **UptimeRobot** | Pings `/health`, which keeps the free instance awake and reports downtime |
+| **UptimeRobot** | Probes `/health` every 5 minutes, which both keeps the free instance awake and reports real downtime |
 | **r.jina.ai** | Renders JavaScript-dependent pages when a plain read finds nothing |
 
 ---
@@ -593,7 +593,7 @@ physically cannot return a shape the rest of the code does not expect.
 ```mermaid
 flowchart TB
     USER["Browser"]
-    MON["UptimeRobot<br/>GET /health every 5 min"]
+    MON["UptimeRobot<br/>probes /health every 5 min"]
 
     subgraph VERCEL["Vercel"]
         FE["React app<br/>routes, session, polling"]

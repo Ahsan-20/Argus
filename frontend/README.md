@@ -3,8 +3,11 @@
 The React client for Argus. A single-page app for creating watchers, following
 what they find, and managing your account.
 
-The API it talks to is in [`../backend`](../backend). The project overview, live
-URL and screenshots are in the [root README](../README.md).
+**Live:** https://argus-one-hazel.vercel.app
+
+The API it talks to is in [`../backend`](../backend), deployed at
+https://argus-xv4m.onrender.com. The project overview and screenshots are in the
+[root README](../README.md).
 
 **Stack:** React 19, Vite 8, React Router 7, TanStack Query 5, Tailwind CSS 4,
 framer-motion. Plain JavaScript with JSX, no TypeScript. All charts and diagrams
@@ -83,14 +86,14 @@ flowchart TB
 
 | Path | Lines | Contains |
 |---|---:|---|
-| `pages/Console.jsx` | 767 | Dashboard: watcher cards, tabs, activity, orbit map |
+| `pages/Console.jsx` | 764 | Dashboard: watcher cards, tabs, activity, orbit map |
 | `pages/Dossier.jsx` | 703 | One watcher: dial, check history, trend, alerts, edit |
 | `pages/Launch.jsx` | 572 | Three-step create flow |
 | `index.css` | 479 | Design tokens, background, keyframes |
 | `pages/Guide.jsx` | 343 | How it works |
 | `components/OrbitMap.jsx` | 333 | The animated sky, inline SVG |
 | `pages/Landing.jsx` | 309 | Marketing page |
-| `components/TopBar.jsx` | 292 | Header, nav, account menu, mobile sheet |
+| `components/TopBar.jsx` | 258 | Header, nav, account menu, mobile sheet |
 | `components/WatchDial.jsx` | 191 | Per-watcher state dial |
 | `pages/Settings.jsx` | 165 | Account and preferences |
 | `components/Sparkline.jsx` | 151 | Tracked-value trend chart |
