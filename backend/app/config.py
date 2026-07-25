@@ -56,6 +56,19 @@ class Settings(BaseSettings):
     # SMTP, and a blocked port hangs rather than failing, so a request that
     # sends mail never returns. An HTTP API leaves on 443 like anything else.
     # Set this and mail goes that way; leave it blank and SMTP is used.
+    # A Google Apps Script deployed as a web app, which sends via MailApp from
+    # inside the Google account that owns the mailbox. The best option when the
+    # host blocks SMTP: the backend reaches it over ordinary HTTPS, and because
+    # Gmail itself does the sending the mail authenticates and lands in inboxes
+    # rather than spam. Needs no Cloud project, no billing and no card.
+    # See tools/apps_script_mailer.gs.
+    apps_script_mail_url: str = ""
+    apps_script_mail_secret: str = ""
+
+    @property
+    def apps_script_mail_enabled(self) -> bool:
+        return bool(self.apps_script_mail_url and self.apps_script_mail_secret)
+
     brevo_api_key: str = ""
     # Who the mail claims to be from. Defaults to the SMTP username, which is
     # right when Gmail is doing the sending, but an HTTP provider will only

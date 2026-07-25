@@ -78,7 +78,15 @@ def send_alert(
             _LOGO_BYTES, maintype="image", subtype="png", cid=LOGO_CID
         )
 
-    if settings.brevo_api_key:
+    # Preference order, and why. The Apps Script relay is best: it is reached
+    # over HTTPS so no host blocks it, and Gmail itself does the sending, so
+    # the mail authenticates and reaches inboxes. Brevo also avoids the port
+    # block but sends on our behalf, which fails SPF and DKIM alignment for a
+    # @gmail.com sender and invites the spam folder. Plain SMTP authenticates
+    # properly but many hosts block the ports outright.
+    if settings.apps_script_mail_enabled:
+        _send_apps_script(recipient, subject, body, html)
+    elif settings.brevo_api_key:
         _send_http(recipient, subject, body, html)
     else:
         _send(msg)
@@ -87,6 +95,48 @@ def send_alert(
 
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 HTTP_TIMEOUT = 20
+
+
+def _send_apps_script(to: str, subject: str, body: str, html: str | None) -> None:
+    """Hand the message to a Google Apps Script web app, which sends it.
+
+    follow_redirects matters: an Apps Script web app answers with a 302 to
+    script.googleusercontent.com and does the work there. Without following it
+    every send would look like it failed while having quietly succeeded.
+
+    The script answers 200 with {"ok": false} on its own errors rather than an
+    HTTP error code, so the body has to be read. A transport that reports
+    success because the status line looked fine is worse than one that fails.
+    """
+    payload = {
+        "secret": settings.apps_script_mail_secret,
+        "to": to,
+        "subject": subject,
+        "text": body,
+        "fromName": settings.smtp_from_name or "Argus",
+    }
+    if html:
+        payload["html"] = html
+        payload["logoBase64"] = base64.b64encode(_LOGO_BYTES).decode()
+        payload["logoCid"] = LOGO_CID
+
+    resp = httpx.post(
+        settings.apps_script_mail_url,
+        json=payload,
+        timeout=HTTP_TIMEOUT,
+        follow_redirects=True,
+    )
+    if resp.status_code >= 300:
+        logger.warning("apps script relay HTTP %s: %s", resp.status_code, resp.text[:200])
+        raise RuntimeError(f"mail relay returned {resp.status_code}")
+    try:
+        result = resp.json()
+    except Exception:
+        logger.warning("apps script relay gave non-JSON: %s", resp.text[:200])
+        raise RuntimeError("mail relay gave an unexpected response")
+    if not result.get("ok"):
+        logger.warning("apps script relay refused: %s", result)
+        raise RuntimeError(f"mail relay refused: {result.get('error')}")
 
 
 def _send_http(to: str, subject: str, body: str, html: str | None) -> None:
