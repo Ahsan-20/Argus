@@ -56,23 +56,6 @@ class Settings(BaseSettings):
     # SMTP, and a blocked port hangs rather than failing, so a request that
     # sends mail never returns. An HTTP API leaves on 443 like anything else.
     # Set this and mail goes that way; leave it blank and SMTP is used.
-    # Gmail's HTTP API. The best of the options when SMTP is blocked: it goes
-    # out over 443 like any other request, and the mail genuinely originates
-    # from the Gmail account, so SPF and DKIM align and it lands in inboxes
-    # rather than spam. A third party claiming to send as @gmail.com cannot do
-    # that. Obtain the refresh token once with tools/gmail_auth.py.
-    gmail_client_id: str = ""
-    gmail_client_secret: str = ""
-    gmail_refresh_token: str = ""
-
-    @property
-    def gmail_api_enabled(self) -> bool:
-        return bool(
-            self.gmail_client_id
-            and self.gmail_client_secret
-            and self.gmail_refresh_token
-        )
-
     brevo_api_key: str = ""
     # Who the mail claims to be from. Defaults to the SMTP username, which is
     # right when Gmail is doing the sending, but an HTTP provider will only

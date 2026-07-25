@@ -78,15 +78,7 @@ def send_alert(
             _LOGO_BYTES, maintype="image", subtype="png", cid=LOGO_CID
         )
 
-    # Preference order, and the reasons for it. Gmail's API is best: it leaves
-    # on 443 so no host blocks it, and the mail really is from the Gmail
-    # account, so it authenticates and lands in inboxes. Brevo also leaves on
-    # 443 but sends on our behalf, which fails SPF and DKIM alignment for a
-    # @gmail.com sender and invites the spam folder. Plain SMTP is the simplest
-    # and authenticates properly, but many hosts block the ports outright.
-    if settings.gmail_api_enabled:
-        _send_gmail_api(msg)
-    elif settings.brevo_api_key:
+    if settings.brevo_api_key:
         _send_http(recipient, subject, body, html)
     else:
         _send(msg)
@@ -94,50 +86,7 @@ def send_alert(
 
 
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
-GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token"
-GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
 HTTP_TIMEOUT = 20
-
-
-def _gmail_access_token() -> str:
-    """Trade the long lived refresh token for a short lived access token.
-
-    Not cached. A send happens a handful of times a day at most, and one extra
-    request is a fair price for having no expiry logic to get wrong.
-    """
-    r = httpx.post(
-        GMAIL_TOKEN_URL,
-        data={
-            "client_id": settings.gmail_client_id,
-            "client_secret": settings.gmail_client_secret,
-            "refresh_token": settings.gmail_refresh_token,
-            "grant_type": "refresh_token",
-        },
-        timeout=HTTP_TIMEOUT,
-    )
-    if r.status_code != 200:
-        logger.warning("gmail token refresh failed %s: %s", r.status_code, r.text[:200])
-        raise RuntimeError(f"gmail token refresh returned {r.status_code}")
-    return r.json()["access_token"]
-
-
-def _send_gmail_api(msg: EmailMessage) -> None:
-    """Send the already built MIME message through Gmail's HTTP API.
-
-    The same message object SMTP would have sent, handed over the web instead:
-    identical headers, identical inline logo, identical everything. Only the
-    transport differs, which is exactly what makes this safe to swap in.
-    """
-    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-    r = httpx.post(
-        GMAIL_SEND_URL,
-        json={"raw": raw},
-        headers={"Authorization": f"Bearer {_gmail_access_token()}"},
-        timeout=HTTP_TIMEOUT,
-    )
-    if r.status_code >= 300:
-        logger.warning("gmail send failed %s: %s", r.status_code, r.text[:250])
-        raise RuntimeError(f"gmail API returned {r.status_code}")
 
 
 def _send_http(to: str, subject: str, body: str, html: str | None) -> None:
