@@ -30,7 +30,11 @@ export default function Reset() {
       applySession(session);
       navigate("/console", { replace: true });
     } catch (err) {
-      setError(err.detail || "Could not reset your password");
+      setError(
+        err.status === 0
+          ? "Could not reach Argus. It may be waking up, which takes up to a minute. Your link is still valid, try again shortly."
+          : err.detail || "Could not reset your password",
+      );
       setBusy(false);
     }
   }

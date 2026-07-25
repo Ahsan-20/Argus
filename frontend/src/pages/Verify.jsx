@@ -41,7 +41,14 @@ export default function Verify() {
         setTimeout(() => navigate("/console", { replace: true }), 1400);
       })
       .catch((err) => {
-        setError(err.detail || "That link is not valid or has expired");
+        // Never blame the link for a network failure. Telling someone their
+        // link expired when the service is simply asleep sends them off asking
+        // for new links that will fail the same way.
+        setError(
+          err.status === 0
+            ? "Could not reach Argus to check this link. It may be waking up, which takes up to a minute. Try again shortly, the link is still good."
+            : err.detail || "That link is not valid or has expired",
+        );
         setPhase("failed");
       });
   }, [token, applySession, navigate]);
@@ -53,7 +60,11 @@ export default function Verify() {
       await api.resendVerification();
       setResent("Sent. Check your inbox in a moment.");
     } catch (err) {
-      setError(err.detail || "Could not send it just now");
+      setError(
+        err.status === 0
+          ? "Could not reach Argus just now. It may be waking up, try again in a moment."
+          : err.detail || "Could not send it just now",
+      );
     }
   }
 

@@ -43,17 +43,36 @@ export function EmptyState({
 }
 
 export function ErrorState({ error, onRetry, className = "" }) {
-  const message =
-    (error && (error.detail || error.message)) || "Something went wrong.";
+  // Status 0 is our marker for "the request never reached the server": no
+  // network, DNS gone, or the host still waking up. It is not a fault in the
+  // thing being loaded, and it is the one case where waiting genuinely does
+  // fix it, so it gets its own wording instead of the raw "uplink
+  // unreachable" the API client uses internally.
+  const offline = error?.status === 0;
+  const heading = offline ? "Can't reach Argus" : "Couldn't load this";
+  const message = offline
+    ? "The service may be waking up, which takes up to a minute on first visit. Your watchers keep running either way."
+    : (error && (error.detail || error.message)) || "Something went wrong.";
+
   return (
     <div
-      className={`flex flex-col items-start gap-3 rounded-xl border border-red/50 bg-[rgba(255,107,129,0.06)] p-4 ${className}`}
+      className={`flex flex-col items-start gap-3 rounded-xl border p-4 ${className}`}
+      style={
+        offline
+          ? { borderColor: "var(--color-lineb)", background: "var(--color-panel2)" }
+          : { borderColor: "rgba(255,107,129,0.5)", background: "rgba(255,107,129,0.06)" }
+      }
       role="alert"
     >
-      <p className="text-[14px] font-semibold text-red">Couldn't load this</p>
-      <p className="text-[14px] text-text2">{message}</p>
+      <p
+        className="text-[14px] font-semibold"
+        style={{ color: offline ? "var(--color-text)" : "var(--color-red)" }}
+      >
+        {heading}
+      </p>
+      <p className="text-[14px] leading-relaxed text-text2">{message}</p>
       {onRetry && (
-        <Button variant="danger" onClick={onRetry}>
+        <Button variant={offline ? "secondary" : "danger"} onClick={onRetry}>
           Try again
         </Button>
       )}
