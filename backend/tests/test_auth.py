@@ -117,3 +117,28 @@ def test_malformed_tokens_never_raise():
     """Anything can arrive in a URL. None of it should reach a traceback."""
     for junk in ["", "no-dot", "a.b.c", "....", "!!!.???", None]:
         assert read_token(junk, kind="session") is None
+
+
+# ---------------------------------------------------------------------------
+# Endpoints an uptime monitor watches
+# ---------------------------------------------------------------------------
+def test_monitored_paths_answer_head_as_well_as_get():
+    """Uptime monitors commonly probe with HEAD, not GET, because it costs a
+    fraction of the bandwidth.
+
+    FastAPI's @app.get registers GET alone, unlike plain Starlette which adds
+    HEAD alongside it. That difference had the deployed service returning 405
+    Method Not Allowed to every probe and being reported as down while it was
+    serving traffic perfectly well. The response time graph was the giveaway:
+    it kept recording times right through the supposed outage.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    # No lifespan: this asserts routing only, and starting it would reach for
+    # a database and a scheduler that these tests deliberately do without.
+    client = TestClient(app)
+    for path in ("/", "/health"):
+        assert client.get(path).status_code == 200, path
+        assert client.head(path).status_code == 200, path

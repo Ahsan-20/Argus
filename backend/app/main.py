@@ -87,7 +87,15 @@ app.include_router(watchers.router)
 app.include_router(demo_router.router)
 
 
-@app.get("/")
+# HEAD as well as GET, on both of the paths a monitor is likely to watch.
+#
+# FastAPI's @app.get registers GET alone, unlike plain Starlette, which adds
+# HEAD alongside it. Uptime monitors commonly send HEAD because it costs a
+# fraction of the bandwidth, and they were getting 405 Method Not Allowed and
+# reporting the service as down. The giveaway was the response time graph: it
+# kept recording times right through the outage, because the server was
+# answering promptly, just with the wrong status code.
+@app.api_route("/", methods=["GET", "HEAD"])
 def root() -> dict:
     """A friendly landing point for the API's own address.
 
@@ -119,7 +127,7 @@ def logo() -> Response:
     return Response(content=data, media_type="image/png")
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health(db: Session = Depends(get_db)) -> dict:
     """Liveness plus a real database round trip, for the deploy health check."""
     db_ok = True
