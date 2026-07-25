@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -76,6 +76,24 @@ def _link(path: str, token: str) -> str:
 # --------------------------------------------------------------------------
 # Outgoing mail
 # --------------------------------------------------------------------------
+def _send_verification_safely(email: str) -> None:
+    """Send the verification email outside the request, never raising.
+
+    Runs after the response has gone, so nothing it does can affect what the
+    caller sees. Takes an address rather than a User because the session that
+    loaded that row is closed by the time this runs.
+    """
+    from ..db import SessionLocal
+
+    try:
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == email).one_or_none()
+            if user and not user.is_verified:
+                _send_verification(user)
+    except Exception as exc:
+        logger.warning("verification email failed for %s: %s", email, exc)
+
+
 def _send_verification(user: User) -> None:
     url = _link("/verify", verify_token(user.email))
     hours = settings.verify_grace_hours
@@ -101,6 +119,19 @@ def _send_verification(user: User) -> None:
             ),
         ),
     )
+
+
+def _send_reset_safely(email: str) -> None:
+    """Send the reset email outside the request, never raising."""
+    from ..db import SessionLocal
+
+    try:
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == email).one_or_none()
+            if user:
+                _send_reset(user)
+    except Exception as exc:
+        logger.warning("reset email failed for %s: %s", email, exc)
 
 
 def _send_reset(user: User) -> None:
@@ -172,7 +203,11 @@ def _signed_in(user: User) -> dict:
 # Endpoints
 # --------------------------------------------------------------------------
 @router.post("/signup")
-def signup(payload: Credentials, db: Session = Depends(get_db)) -> dict:
+def signup(
+    payload: Credentials,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> dict:
     email = normalise_email(payload.email)
     if not email_looks_valid(email):
         raise HTTPException(400, "That does not look like an email address")
@@ -193,14 +228,20 @@ def signup(payload: Credentials, db: Session = Depends(get_db)) -> dict:
     db.commit()
     db.refresh(user)
 
-    # A mail server having a bad day must not cost someone their account: it
-    # exists, they are signed in, and they can ask for the email again.
-    try:
-        _send_verification(user)
-        user.verify_sent_at = _now()
-        db.commit()
-    except Exception as exc:
-        logger.warning("verification email failed for %s: %s", email, exc)
+    # The email goes out AFTER the response, never during it. Creating an
+    # account is not the same job as announcing it, and tying them together
+    # means an SMTP server that is slow, or a host that blocks outbound mail,
+    # holds up the one request a new visitor makes. That is exactly what
+    # happened on the first deployment: signup hung rather than failing, and a
+    # hang has no error anyone can catch or explain.
+    #
+    # verify_sent_at is stamped now rather than on success, so the resend
+    # cooldown starts from the attempt. Someone whose email genuinely failed
+    # waits one minute for the retry button, which is a far better outcome than
+    # waiting for the account itself.
+    user.verify_sent_at = _now()
+    db.commit()
+    background_tasks.add_task(_send_verification_safely, user.email)
 
     return _signed_in(user)
 
@@ -292,7 +333,11 @@ def resend(user: User = Depends(current_user), db: Session = Depends(get_db)) ->
 
 
 @router.post("/forgot")
-def forgot(payload: EmailOnly, db: Session = Depends(get_db)) -> dict:
+def forgot(
+    payload: EmailOnly,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> dict:
     """Always the same answer, whether or not the address is known.
 
     Anything else turns this into a way to ask "does this person have an
@@ -302,14 +347,16 @@ def forgot(payload: EmailOnly, db: Session = Depends(get_db)) -> dict:
     if email_looks_valid(email):
         user = db.query(User).filter(User.email == email).one_or_none()
         if user:
-            try:
-                _send_reset(user)
-                user.reset_requested_at = _now()
-                # Any reset link issued earlier stops working now.
-                user.reset_used_at = None
-                db.commit()
-            except Exception as exc:
-                logger.warning("reset email failed for %s: %s", email, exc)
+            user.reset_requested_at = _now()
+            # Any reset link issued earlier stops working now.
+            user.reset_used_at = None
+            db.commit()
+            # After the response, for the same reason as signup. It also keeps
+            # the timing identical whether or not the address exists: a send
+            # that happened inside the request would make a known address
+            # measurably slower to answer, which is the leak this endpoint is
+            # carefully worded to avoid.
+            background_tasks.add_task(_send_reset_safely, email)
     return {"ok": True}
 
 

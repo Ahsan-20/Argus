@@ -67,17 +67,31 @@ def send_alert(
     return {"sent": True, "to": recipient, "subject": subject, "body": body}
 
 
+# Without this, smtplib inherits the global default socket timeout, which is
+# None, meaning wait forever. Hosting providers routinely block outbound SMTP
+# to stop their address ranges being used for spam, and a blocked port does not
+# refuse the connection, it swallows it. The result is a request that never
+# returns rather than an error anyone can see or handle: signing up hung
+# indefinitely on a deployment where everything else worked.
+SMTP_TIMEOUT = 20
+
+
 def _send(msg: EmailMessage) -> None:
     """Deliver over SSL (port 465) or STARTTLS (port 587, Gmail's default)."""
     context = ssl.create_default_context()
     if settings.smtp_port == 465:
         with smtplib.SMTP_SSL(
-            settings.smtp_host, settings.smtp_port, context=context
+            settings.smtp_host,
+            settings.smtp_port,
+            context=context,
+            timeout=SMTP_TIMEOUT,
         ) as server:
             server.login(settings.smtp_user, settings.smtp_password)
             server.send_message(msg)
     else:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+        with smtplib.SMTP(
+            settings.smtp_host, settings.smtp_port, timeout=SMTP_TIMEOUT
+        ) as server:
             server.starttls(context=context)
             server.login(settings.smtp_user, settings.smtp_password)
             server.send_message(msg)
