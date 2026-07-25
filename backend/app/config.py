@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     # sends mail never returns. An HTTP API leaves on 443 like anything else.
     # Set this and mail goes that way; leave it blank and SMTP is used.
     brevo_api_key: str = ""
+    # Who the mail claims to be from. Defaults to the SMTP username, which is
+    # right when Gmail is doing the sending, but an HTTP provider will only
+    # send from an address it has verified, and that need not be the same one.
+    # Keeping it separate means changing the transport does not mean changing
+    # the credential.
+    mail_from: str = ""
 
     # ---- WhatsApp channel (optional second channel, via CallMeBot) ----
     # Free, no signup: message the CallMeBot number once to get an api key

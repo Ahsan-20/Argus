@@ -102,7 +102,10 @@ def _send_http(to: str, subject: str, body: str, html: str | None) -> None:
     """
     payload: dict = {
         "sender": {
-            "email": settings.smtp_user,
+            # MAIL_FROM when set, else the SMTP username. An HTTP provider
+            # only sends from an address it has verified, which is often not
+            # the mailbox whose password happens to be in SMTP_USER.
+            "email": settings.mail_from or settings.smtp_user,
             "name": settings.smtp_from_name or "Argus",
         },
         "to": [{"email": to}],
