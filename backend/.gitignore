@@ -1,0 +1,19 @@
+# ---- Secrets (never commit) ----
+.env
+.env.*
+!.env.example
+
+# ---- Python ----
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+argus_dev.db
+*.sqlite3
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

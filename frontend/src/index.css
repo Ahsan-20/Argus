@@ -1,0 +1,479 @@
+@import "tailwindcss";
+
+/* ===========================================================================
+   ARGUS design tokens — human-friendly revision.
+   A calm night sky, one warm gold accent, soft rounded cards, plain language.
+   Token NAMES are unchanged so utilities keep working; values are softened.
+   =========================================================================== */
+@theme {
+  --color-void: #0b0f1e; /* page background: deep calm navy */
+  --color-panel: #131829; /* card surface */
+  --color-panel2: #1a2138; /* inset / wells */
+  --color-raised: #202946; /* hover surface */
+  --color-line: #262e47; /* soft border */
+  --color-lineb: #35405f; /* border emphasis */
+
+  --color-amber: #ffb000; /* the one warm accent */
+  --color-ambersoft: #ffc947;
+
+  --color-green: #3ddc84; /* good news */
+  --color-red: #ff6b81; /* trouble (softened) */
+  --color-steel: #8a93ac; /* neutral state */
+
+  --color-text: #f5f7ff;
+  --color-text2: #c7cde0;
+  --color-label: #98a1bc;
+  --color-muted: #6e7791;
+
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --ease-ui: cubic-bezier(0.2, 0, 0, 1);
+}
+
+:root {
+  --amber-fill: rgba(255, 176, 0, 0.12);
+  --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+body {
+  background-color: var(--color-void);
+  color: var(--color-text2);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+/* Tabular figures for numbers that update in place. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Small field/section label: quiet, sentence case, no shouting. */
+.label {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-label);
+}
+
+/* Timestamps and data values that benefit from mono alignment. */
+.data {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+/* Focus: visible, warm, generous. */
+:focus-visible {
+  outline: 2px solid var(--color-amber);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.measure {
+  max-width: 62ch;
+}
+
+::selection {
+  background: var(--amber-fill);
+  color: var(--color-text);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 8px;
+}
+
+/* ===========================================================================
+   Atmosphere: a faint, static starfield plus one soft warm glow. That's it.
+   No scanlines, no vignette, no grid. Toggle off via data-texture.
+   =========================================================================== */
+.tex {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  /* Nothing in here can affect layout or hit-testing elsewhere, so the
+     browser can skip it when working out the rest of the page. */
+  contain: strict;
+}
+[data-texture="off"] .tex {
+  display: none;
+}
+
+/* A sky nobody is looking at should not cost anything. Browsers throttle
+   scripted animation on a hidden tab but keep running CSS animation, so the
+   whole layer is parked when the tab goes to the background. */
+[data-idle="true"] .tex,
+[data-idle="true"] .tex * {
+  animation-play-state: paused !important;
+}
+
+.tex-stars {
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, #ffffff20, transparent),
+    radial-gradient(1px 1px at 27% 62%, #ffffff16, transparent),
+    radial-gradient(1px 1px at 41% 31%, #ffffff1c, transparent),
+    radial-gradient(1px 1px at 56% 78%, #ffffff12, transparent),
+    radial-gradient(1px 1px at 68% 22%, #ffffff1a, transparent),
+    radial-gradient(1px 1px at 79% 55%, #ffffff10, transparent),
+    radial-gradient(1px 1px at 88% 84%, #ffffff18, transparent),
+    radial-gradient(1px 1px at 6% 88%, #ffffff14, transparent);
+}
+
+.tex-glow {
+  background:
+    radial-gradient(600px 400px at 75% 0%, rgba(255, 176, 0, 0.05), transparent 70%),
+    radial-gradient(700px 500px at 15% 100%, rgba(70, 90, 180, 0.08), transparent 70%);
+}
+
+/* ===========================================================================
+   Reduced motion: OS setting or the in-app toggle.
+   =========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+[data-motion="reduce"] *,
+[data-motion="reduce"] *::before,
+[data-motion="reduce"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* Soft indeterminate progress bar (loading). */
+@keyframes argus-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+.telemetry-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 25%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, transparent, var(--color-amber), transparent);
+  animation: argus-sweep 1.4s var(--ease-ui) infinite;
+  opacity: 0.6;
+}
+
+/* ===========================================================================
+   Orbit motion. A watcher dot rides a group spinning around the center; a
+   nested group counter-spins so its label stays upright. Negative delay seeds
+   each dot's angle deterministically.
+   =========================================================================== */
+@keyframes argus-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes argus-antispin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+.orbit-ring {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: argus-spin linear infinite;
+}
+.orbit-label {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: argus-antispin linear infinite;
+}
+
+/* Reaching for a moving dot is hard, so on a clickable sky, hovering pauses
+   time: every orbit freezes until the pointer leaves. */
+.orbit-clickable:hover .orbit-ring,
+.orbit-clickable:hover .orbit-label,
+.orbit-clickable:hover .orbit-depth {
+  animation-play-state: paused;
+}
+
+/* One expanding ring when a check happens. */
+@keyframes argus-ping {
+  from {
+    transform: scale(0.2);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+.radar-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: argus-ping 1.2s var(--ease-ui) forwards;
+}
+
+/* ===========================================================================
+   The living sky. All decorative, all frozen invisible under reduced motion
+   (each element's resting opacity is its no-animation state).
+   =========================================================================== */
+
+/* Stars that gently twinkle (base opacity is the frozen state). */
+@keyframes argus-twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+.twinkle {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0.2;
+  animation: argus-twinkle 4.5s ease-in-out infinite;
+}
+.scene-twinkle {
+  opacity: 0.25;
+  animation: argus-twinkle 4.5s ease-in-out infinite;
+}
+
+/* The core "eye" softly breathing. */
+@keyframes argus-breathe {
+  0%,
+  100% {
+    opacity: 0.22;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.18);
+  }
+}
+.core-breathe {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: argus-breathe 5s ease-in-out infinite;
+}
+
+/* Fake 3D: a dot grows and brightens on the near side of its orbit and
+   shrinks and dims on the far side. Runs on the same clock as the rotation,
+   so the two stay in sync automatically. */
+@keyframes argus-depth {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  25% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(0.76);
+    opacity: 0.5;
+  }
+}
+.orbit-depth {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: argus-depth linear infinite;
+}
+
+/* The whole background sky drifts imperceptibly, like a long exposure. */
+@keyframes argus-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-28px, 16px, 0);
+  }
+}
+.tex-drift {
+  animation: argus-drift 180s ease-in-out infinite;
+  /* One promoted layer carrying every star, rather than each star asking for
+     its own. Declared on the mover, not the moved. */
+  will-change: transform;
+}
+
+/* A quiet radar pulse from the core: brief ring, long rest. */
+@keyframes argus-autoping {
+  0% {
+    opacity: 0;
+    transform: scale(0.1);
+  }
+  3% {
+    opacity: 0.45;
+  }
+  26% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+.orbit-autoping {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: argus-autoping 7.5s linear infinite;
+}
+
+/* A shooting star: streaks once, rests long. Two live with offset delays.
+   Moved with translate3d rather than the `translate` property so it is
+   guaranteed its own compositor layer in every engine. */
+@keyframes argus-shoot {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(23.5deg);
+  }
+  2% {
+    opacity: 0.75;
+  }
+  9% {
+    opacity: 0;
+    transform: translate3d(55vmin, 24vmin, 0) rotate(23.5deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(55vmin, 24vmin, 0) rotate(23.5deg);
+  }
+}
+.shoot {
+  position: absolute;
+  width: 110px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85));
+  transform: translate3d(0, 0, 0) rotate(23.5deg);
+  opacity: 0;
+  animation: argus-shoot 16s linear infinite;
+}
+
+/* Half the stars are decoration on top of decoration. A phone does the work
+   of six rather than twelve, and nobody can tell the difference. */
+@media (max-width: 640px) {
+  .twinkle-extra {
+    display: none;
+  }
+}
+
+/* The "Watching" dot in the lifecycle diagram, kept quietly breathing so the
+   diagram reads as something in motion. Box-shadow rather than a second
+   element, so there is nothing extra in the layout to lay out. */
+@keyframes argus-guide-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 176, 0, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(255, 176, 0, 0);
+  }
+}
+.guide-pulse {
+  animation: argus-guide-pulse 2.6s ease-out infinite;
+}
+
+/* Story chips that float over the hero scene, acting out the product:
+   fade in, hold, fade away, on a long loop. */
+@keyframes argus-chip {
+  0%,
+  52% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  58%,
+  88% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  94%,
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.hero-chip {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-panel) 92%, transparent);
+  backdrop-filter: blur(4px);
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-text2);
+  box-shadow: var(--card-shadow);
+  opacity: 0;
+  animation: argus-chip 11s var(--ease-ui) infinite;
+  pointer-events: none;
+  white-space: nowrap;
+}

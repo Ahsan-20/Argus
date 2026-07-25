@@ -1,0 +1,10 @@
+# Normalise line endings in the repository to LF, whatever the checkout OS.
+# Without this, a clone on Linux (which is what the deploy hosts do) sees every
+# file as modified, and diffs between contributors on different systems become
+# unreadable noise.
+* text=auto eol=lf
+
+# Binary, never touched.
+*.png binary
+*.jpg binary
+*.ico binary
