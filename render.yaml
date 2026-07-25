@@ -7,18 +7,20 @@
 services:
   - type: web
     name: argus-api
-    runtime: python
+    runtime: docker
     plan: free
+    # Nearest region to the database, which is in Tokyo. The service makes
+    # several queries per request, so that hop matters more than any other.
+    region: singapore
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    # The scheduler runs inside this process, so one worker only. Two workers
-    # would each run their own loop; the atomic claim would still prevent
-    # duplicate work, but there is nothing to gain from the extra process.
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Both paths are relative to rootDir, not to the repository root. The
+    # Dockerfile's COPY instructions assume backend/ is the build context.
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # No start command: the Dockerfile's CMD binds $PORT already. The scheduler
+    # runs inside this process, so one instance is all that is wanted.
     healthCheckPath: /health
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.12"
       - key: APP_ENV
         value: production
 
