@@ -18,8 +18,8 @@ thing you are waiting for has happened, and tells you the moment it has.
 
 | | |
 |---|---|
-| **App** | https://argus-watch.vercel.app |
-| **API** | https://argus-api.onrender.com/health |
+| **App** | **https://argus-one-hazel.vercel.app** |
+| **API** | https://argus-xv4m.onrender.com |
 | **Repository** | https://github.com/Ahsan-20/Argus |
 
 You can create an account and use it straight away. A confirmation email is sent
