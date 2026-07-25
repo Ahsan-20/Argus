@@ -35,6 +35,46 @@ export function useHealth() {
   });
 }
 
+// How long the connection has to stay bad before we say so out loud.
+// One failed cycle is almost always a sleeping host waking up. Two in a row
+// means something is actually wrong.
+const OFFLINE_AFTER = 25_000;
+
+/**
+ * Is the backend really unreachable, or did one request just stumble?
+ *
+ * `isError` alone is too eager: it goes true on a single failure, which on a
+ * host that sleeps when idle is the ordinary first request of any visit. The
+ * banner would then announce a problem that had already fixed itself before
+ * anyone finished reading it.
+ *
+ * So a failure only counts once it has persisted well past one poll cycle
+ * beyond the last success. A genuine outage still surfaces within about half a
+ * minute, and a wake-up never does.
+ */
+export function useConnection() {
+  const health = useHealth();
+  const { isError, data, errorUpdatedAt, dataUpdatedAt } = health;
+
+  const neverConnected = isError && !data;
+  const staleFailure =
+    isError && Boolean(data) && errorUpdatedAt - dataUpdatedAt > OFFLINE_AFTER;
+  const offline = neverConnected || staleFailure;
+
+  return {
+    query: health,
+    offline,
+    // ok, degraded (reachable but the database is not), or offline.
+    status: offline
+      ? "offline"
+      : data?.status === "ok"
+        ? "ok"
+        : data
+          ? "degraded"
+          : "ok",
+  };
+}
+
 export function useStats(enabled = true) {
   return useQuery({
     queryKey: keys.stats,

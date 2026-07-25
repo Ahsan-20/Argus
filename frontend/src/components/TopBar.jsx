@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { Logo } from "./Logo.jsx";
 import { Button } from "./Button.jsx";
-import { useHealth } from "../hooks/useQueries.js";
+import { useConnection } from "../hooks/useQueries.js";
 import { useSession } from "../state/session.jsx";
 
 // One header for the whole site, aware of whether you're signed in.
@@ -39,7 +39,7 @@ export function TopBar() {
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef(null);
   const location = useLocation();
-  const health = useHealth();
+  const { status } = useConnection();
 
   // Close both menus whenever navigation happens.
   useEffect(() => {
@@ -65,13 +65,6 @@ export function TopBar() {
     };
   }, [accountOpen]);
 
-  const status = health.isError
-    ? "offline"
-    : health.data?.status === "ok"
-      ? "ok"
-      : health.data
-        ? "degraded"
-        : "offline";
   const uplink = UPLINK[status];
 
   const name = operator ? operator.split("@")[0] : "";

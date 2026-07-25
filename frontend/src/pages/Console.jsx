@@ -12,7 +12,7 @@ import {
   useFleet,
   useSharedFleet,
   useStats,
-  useHealth,
+  useConnection,
   useProbeControls,
 } from "../hooks/useQueries.js";
 import { useSession } from "../state/session.jsx";
@@ -388,7 +388,7 @@ export default function Console() {
   const navigate = useNavigate();
   const { operator } = useSession();
   const toast = useToast();
-  const health = useHealth();
+  const connection = useConnection();
   const stats = useStats();
 
   const [view, setView] = useState("mine"); // mine | found | shared
@@ -398,7 +398,7 @@ export default function Console() {
   const fleet = fleetQ.data || [];
   const shared = sharedQ.data || [];
 
-  const offline = health.isError;
+  const offline = connection.offline;
   const firstName = operator ? operator.split("@")[0] : "there";
 
   // Watchers this operator owns count toward their personal limit. The shared
