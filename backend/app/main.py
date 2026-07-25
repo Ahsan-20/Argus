@@ -54,7 +54,21 @@ async def lifespan(app: FastAPI):
         await scheduler.stop(task)
 
 
-app = FastAPI(title="Argus", version="0.1.0", lifespan=lifespan)
+# The interactive documentation is a development convenience, not something a
+# public deployment should serve. It lists every endpoint and its request shape,
+# which is a map of the attack surface handed to anyone who asks, and there is
+# no reason for a stranger to have it. openapi_url goes too: leaving it would
+# publish the same schema in raw form while only appearing to close the door.
+_dev_docs = settings.app_env.lower() != "production"
+
+app = FastAPI(
+    title="Argus",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/docs" if _dev_docs else None,
+    redoc_url="/redoc" if _dev_docs else None,
+    openapi_url="/openapi.json" if _dev_docs else None,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -71,6 +85,27 @@ app.add_middleware(
 app.include_router(accounts_router.router)
 app.include_router(watchers.router)
 app.include_router(demo_router.router)
+
+
+@app.get("/")
+def root() -> dict:
+    """A friendly landing point for the API's own address.
+
+    Two reasons this exists rather than letting `/` 404. Anyone who opens the
+    API URL directly, from a link or out of curiosity, deserves to learn what
+    they have found and where the actual app is, instead of reading
+    {"detail":"Not Found"}. And an uptime monitor pointed at the bare domain
+    then reports the truth: a 404 would keep the instance awake just as well,
+    but it would also flag the service as permanently down, and an alert that
+    is always firing is an alert nobody reads.
+    """
+    return {
+        "service": "argus",
+        "status": "running",
+        "description": "Argus watches a web page and emails you when the thing you are waiting for happens.",
+        "app": settings.frontend_base_url or None,
+        "health": "/health",
+    }
 
 
 @app.get("/logo.png")

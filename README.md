@@ -721,7 +721,8 @@ curl http://127.0.0.1:8000/health
 # {"status":"ok","service":"argus","env":"development","db":true}
 ```
 
-API docs are at http://127.0.0.1:8000/docs.
+Interactive API documentation is at http://127.0.0.1:8000/docs when running
+locally. It is switched off in production.
 
 ### 3. Frontend
 

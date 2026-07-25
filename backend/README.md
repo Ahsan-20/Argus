@@ -18,7 +18,7 @@ Groq fallback, SMTP.
 ```mermaid
 flowchart TB
     BROWSER["Browser<br/>React client"]
-    MONITOR["Uptime monitor<br/>GET /health every 5 min"]
+    MONITOR["Uptime monitor<br/>GET /health every 5 min<br/>keeps a free instance awake"]
 
     subgraph APP["FastAPI application"]
         direction TB
@@ -241,7 +241,11 @@ email is both the identity and the alert destination.
 
 ## API reference
 
-Interactive documentation at `/docs`.
+Interactive documentation is served at `/docs` in development only. It is
+switched off when `APP_ENV=production`, along with `/redoc` and
+`/openapi.json`, because publishing a map of every endpoint and its request
+shape to anyone who asks buys nothing. Blocking `/docs` alone would have left
+the same schema readable in raw form.
 
 ### Accounts
 
@@ -281,6 +285,7 @@ stored.
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
+| GET | `/` | none | What this service is, and where the app lives. Exists so the bare domain answers instead of returning 404, which also lets an uptime monitor point at it truthfully |
 | GET | `/health` | none | Liveness plus a real database round trip |
 | GET | `/stats` | optional | Counts, plus a `mine` block when signed in |
 | POST | `/pulse` | none | Presence beacon, wakes a sleeping instance |
@@ -395,7 +400,8 @@ immediately rather than waiting for the next minute:
 curl -X POST http://127.0.0.1:8000/tick -H "X-Tick-Secret: <TICK_SECRET>"
 ```
 
-Interactive API documentation is at `http://127.0.0.1:8000/docs`.
+Interactive API documentation is at `http://127.0.0.1:8000/docs`, available
+because `APP_ENV` is `development` locally. It is disabled in production.
 
 ---
 
