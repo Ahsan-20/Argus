@@ -18,8 +18,18 @@ import { usePrefs } from "../state/prefs.jsx";
 //
 // SETTLE only applies once the overlay is actually on screen: having appeared,
 // vanishing in the same breath reads as a glitch rather than as speed.
-const GRACE = 180;
-const SETTLE = 300;
+// How long a navigation has to be slow before covering it is worth doing.
+//
+// This was 180ms, which was tuned against a backend on localhost. Against a
+// real one a round trip is 300 to 800ms, so essentially every navigation
+// crossed the line and got an overlay, typically appearing just as the page
+// finished painting. The result was a full screen cover flashing over content
+// that had already arrived, which reads as a fault rather than as progress.
+//
+// At 600ms almost everything lands first and shows nothing at all. What is
+// left is the genuinely slow case, which is the only one worth covering.
+const GRACE = 600;
+const SETTLE = 250;
 const CEILING = 10_000;
 
 export function RouteLoader() {

@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     # Optional default recipient (demo fleet / fallback when a watcher has none).
     owner_email: str = ""
 
+    # Optional HTTP mail transport. Hosting providers commonly block outbound
+    # SMTP, and a blocked port hangs rather than failing, so a request that
+    # sends mail never returns. An HTTP API leaves on 443 like anything else.
+    # Set this and mail goes that way; leave it blank and SMTP is used.
+    brevo_api_key: str = ""
+
     # ---- WhatsApp channel (optional second channel, via CallMeBot) ----
     # Free, no signup: message the CallMeBot number once to get an api key
     # bound to your number. Leave blank to keep the channel off. Alerts still
