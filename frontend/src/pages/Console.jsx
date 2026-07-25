@@ -12,7 +12,6 @@ import {
   useFleet,
   useSharedFleet,
   useStats,
-  useConnection,
   useProbeControls,
 } from "../hooks/useQueries.js";
 import { useSession } from "../state/session.jsx";
@@ -388,7 +387,6 @@ export default function Console() {
   const navigate = useNavigate();
   const { operator } = useSession();
   const toast = useToast();
-  const connection = useConnection();
   const stats = useStats();
 
   const [view, setView] = useState("mine"); // mine | found | shared
@@ -398,7 +396,6 @@ export default function Console() {
   const fleet = fleetQ.data || [];
   const shared = sharedQ.data || [];
 
-  const offline = connection.offline;
   const firstName = operator ? operator.split("@")[0] : "there";
 
   // Watchers this operator owns count toward their personal limit. The shared
@@ -456,7 +453,7 @@ export default function Console() {
 
   return (
     <>
-      <TelemetryTicker stats={stats.data} fleetCount={fleet.length} offline={offline} />
+      <TelemetryTicker stats={stats.data} fleetCount={fleet.length} />
 
       <main className="mx-auto max-w-[1200px] px-4 py-6 sm:py-8">
         {/* Greeting + the one primary action */}

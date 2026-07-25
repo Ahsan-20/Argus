@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { Logo } from "./Logo.jsx";
 import { Button } from "./Button.jsx";
-import { useConnection } from "../hooks/useQueries.js";
 import { useSession } from "../state/session.jsx";
 
 // One header for the whole site, aware of whether you're signed in.
@@ -10,12 +9,6 @@ import { useSession } from "../state/session.jsx";
 // Signed in:  logo -> dashboard, nav, a "+ New watcher" shortcut, the
 //             connection dot, and an account chip that opens Settings.
 // On phones the nav lives in a proper menu, not a cramped second row.
-
-const UPLINK = {
-  ok: { color: "var(--color-green)", label: "Connected" },
-  degraded: { color: "var(--color-amber)", label: "Connection issues" },
-  offline: { color: "var(--color-red)", label: "Offline" },
-};
 
 function NavItem({ to, children, big = false }) {
   return (
@@ -39,7 +32,6 @@ export function TopBar() {
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef(null);
   const location = useLocation();
-  const { status } = useConnection();
 
   // Close both menus whenever navigation happens.
   useEffect(() => {
@@ -65,7 +57,6 @@ export function TopBar() {
     };
   }, [accountOpen]);
 
-  const uplink = UPLINK[status];
 
   const name = operator ? operator.split("@")[0] : "";
   const initial = (name[0] || "?").toUpperCase();
@@ -105,17 +96,6 @@ export function TopBar() {
               >
                 + New
               </Button>
-
-              <span
-                className="hidden items-center md:flex"
-                title={uplink.label}
-                aria-label={`Connection: ${uplink.label}`}
-              >
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ backgroundColor: uplink.color }}
-                />
-              </span>
 
               {/* Account menu, desktop only. The chip used to be a direct
                   link to Settings, which left sign out buried at the bottom
@@ -260,13 +240,6 @@ export function TopBar() {
                   Sign out
                 </button>
               </div>
-              <span className="mt-2 flex items-center gap-1.5">
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ backgroundColor: uplink.color }}
-                />
-                <span className="text-[12px] text-label">{uplink.label}</span>
-              </span>
             </div>
           ) : (
             <div className="mt-2 space-y-2 border-t border-line pt-3">
