@@ -26,7 +26,12 @@ export function useHealth() {
     queryKey: keys.health,
     queryFn: api.health,
     refetchInterval: FLEET_POLL,
-    retry: false,
+    // One retry, not none. This drives the connection banner, and a host that
+    // sleeps when idle fails the very first request while it wakes. Without a
+    // retry that single stumble latches the banner on for a full poll cycle,
+    // announcing a problem that has already fixed itself.
+    retry: 1,
+    retryDelay: 2000,
   });
 }
 
