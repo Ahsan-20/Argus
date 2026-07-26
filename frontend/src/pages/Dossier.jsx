@@ -140,8 +140,10 @@ export default function Dossier() {
   useTitle(watcherQ.data?.callsign || "Watcher");
 
   if (watcherQ.isLoading) {
-    // Says so in place, where the watcher is about to appear. Holds the height
-    // it will occupy so nothing jumps when the data lands.
+    // Normally unseen: the route cover is over this for the whole fetch. It
+    // matters when that cover times out on a request that never finishes,
+    // where the alternative is a blank page that looks broken. Holds the
+    // height the watcher will occupy so nothing jumps when the data lands.
     return (
       <main className="mx-auto min-h-[60vh] max-w-[980px] px-4 py-10">
         <Panel>

@@ -187,17 +187,22 @@ The background layer uses `contain: strict`, animates only `transform` and
 `opacity`, promotes a single element rather than each star, halves the star count
 on phones, and pauses entirely when the tab is hidden.
 
-**Loading is shown in place, never over the page.** There is no full screen
-transition overlay. Each page either says so where the data will appear, as the
-watcher list and the watcher detail do, or renders without it and fills the
-value in when it lands, as the landing page and settings do with their counts.
+The page transition cover in
+[`src/components/RouteLoader.jsx`](src/components/RouteLoader.jsx) goes up as
+the new page mounts and comes down when that page's data has landed. It counts
+only queries that have no data yet, so a background refresh of a page you are
+already looking at cannot make it appear.
 
-An overlay was tried first and removed. It could only ask whether a request was
-still in flight, never whether the page already had something on screen, so on
-any page that paints before all of its data arrives it appeared a moment later
-and covered content that was already there. Timing thresholds narrowed the
-window without closing it. A page knows what it is showing; a global overlay
-can only guess.
+It is raised in a layout effect, which runs after React commits the new page
+but before the browser paints, so the cover is in the first frame the page
+exists. That ordering is the point. An earlier version waited and then decided
+whether to show, and the threshold was tuned twice without ever working,
+because "is a request in flight" is not the same question as "is the screen
+still empty". A page that renders before all of its data arrives, as the
+landing page does with its counts, is finished as far as the reader is
+concerned, so deciding late meant covering a page that was already there.
+Deciding at the front removes the possibility. A minimum visible duration keeps
+a cached navigation from turning the cover into a flicker.
 
 ### Writing
 

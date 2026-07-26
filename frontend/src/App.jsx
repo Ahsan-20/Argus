@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { TextureLayers } from "./components/TextureLayers.jsx";
 import { AppShell } from "./components/AppShell.jsx";
 import { TopBar } from "./components/TopBar.jsx";
+import { RouteLoader } from "./components/RouteLoader.jsx";
 import { useSession } from "./state/session.jsx";
 import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
@@ -45,6 +46,8 @@ export default function App() {
     <>
       {/* Fixed, non-interactive atmosphere behind everything. */}
       <TextureLayers />
+      {/* Covers the gap between pages while the next one's data settles. */}
+      <RouteLoader />
       <div className="relative z-10">
         <Routes>
           <Route path="/" element={<Landing />} />
