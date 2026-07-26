@@ -75,19 +75,14 @@ proof.
 
 ## What it does
 
-```mermaid
-flowchart LR
-    A["You write one sentence:<br/>tell me when the dollar<br/>moves by 1 rupee"]
-    B["Commissioner AI<br/>turns it into a<br/>precise watcher"]
-    C["You check the plan<br/>and start it"]
-    D["Every few hours:<br/>Watcher AI reads<br/>the page and judges"]
-    E["Found it"]
-    F["Herald AI writes<br/>the email, you<br/>get it in seconds"]
+<div align="center">
 
-    A --> B --> C --> D
-    D -- "not yet" --> D
-    D -- "condition true,<br/>confidence 70+" --> E --> F
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture-dark.svg">
+  <img alt="Argus architecture: the browser talks to the API, which reads target pages, judges them with Gemini, stores everything in Postgres, and sends the alert out through a mail relay to your inbox" src="docs/architecture-light.svg" width="100%">
+</picture>
+
+</div>
 
 Every check is recorded with the verdict, how sure it was, a quote from the page,
 and the tracked value, so nothing has to be taken on trust.
@@ -222,6 +217,23 @@ model. They never share a conversation.
 | **Commissioner** | Once, when you create a watcher | Turns your sentence into a precise, testable watcher, or refuses and says why |
 | **Watcher** | Every single check, forever | Reads the page and decides whether the condition is true, with evidence and a confidence score |
 | **Herald** | Only when a watcher fires | Writes the alert email you actually read |
+
+The order they run in, and the loop the Watcher sits in for as long as the answer
+is still no:
+
+```mermaid
+flowchart LR
+    A["You write one sentence:<br/>tell me when the dollar<br/>moves by 1 rupee"]
+    B["Commissioner AI<br/>turns it into a<br/>precise watcher"]
+    C["You check the plan<br/>and start it"]
+    D["Every few hours:<br/>Watcher AI reads<br/>the page and judges"]
+    E["Found it"]
+    F["Herald AI writes<br/>the email, you<br/>get it in seconds"]
+
+    A --> B --> C --> D
+    D -- "not yet" --> D
+    D -- "condition true,<br/>confidence 70+" --> E --> F
+```
 
 All three prompts are mine, written and rewritten against real pages. They live
 in one file, [`backend/app/prompts.py`](backend/app/prompts.py), and are printed
@@ -590,17 +602,8 @@ physically cannot return a shape the rest of the code does not expect.
 
 ## How it is put together
 
-<div align="center">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture-dark.svg">
-  <img alt="Argus architecture: the browser talks to the API, which reads target pages, judges them with Gemini, stores everything in Postgres, and sends the alert out through a mail relay to your inbox" src="docs/architecture-light.svg" width="100%">
-</picture>
-
-</div>
-
-The same system with every path drawn in, including the ones that only matter
-when something goes wrong:
+The [overview near the top](#what-it-does) with every path drawn in, including
+the ones that only matter when something goes wrong:
 
 ```mermaid
 flowchart TB
@@ -648,6 +651,8 @@ Deeper technical documentation lives with the code:
   SSRF, accounts and security, API reference, configuration
 - **[frontend/README.md](frontend/README.md)**: routes and guards, the data and
   session layer, design tokens, mobile rules
+- **[docs/engineering-log.md](docs/engineering-log.md)**: the day by day build
+  log, kept as it was written, including the dead ends
 
 ### Engineering worth pointing at
 
@@ -841,6 +846,7 @@ argus/
 │   └── README.md         frontend technical documentation
 └── docs/
     ├── screenshots/      the images used above
+    ├── engineering-log.md   the day by day build log
     ├── architecture-*.svg   the overview diagram, light and dark
     └── build_overview.py    the script that draws it
 ```

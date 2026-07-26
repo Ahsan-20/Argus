@@ -1,4 +1,4 @@
-# Argus — engineering log
+# Argus engineering log
 
 The day-by-day record kept while building Argus: what was tried, what broke,
 what was measured, and what was decided as a result. Preserved verbatim from
