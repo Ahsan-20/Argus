@@ -30,3 +30,4 @@ Thumbs.db
 # produces are committed, so nobody cloning this needs to run it.
 docs/build_overview.py
 docs/icons.json
+backend/tools/gen_logo.py
