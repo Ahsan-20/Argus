@@ -140,10 +140,15 @@ export default function Dossier() {
   useTitle(watcherQ.data?.callsign || "Watcher");
 
   if (watcherQ.isLoading) {
-    // Deliberately blank. The route overlay is already covering the screen
-    // for this exact fetch, and a second sliding bar behind it just competed
-    // with it. Reserves the height so nothing jumps when the data lands.
-    return <main className="mx-auto min-h-[60vh] max-w-[980px] px-4 py-10" />;
+    // Says so in place, where the watcher is about to appear. Holds the height
+    // it will occupy so nothing jumps when the data lands.
+    return (
+      <main className="mx-auto min-h-[60vh] max-w-[980px] px-4 py-10">
+        <Panel>
+          <Loading label="Opening this watcher…" />
+        </Panel>
+      </main>
+    );
   }
   if (watcherQ.isError) {
     return (

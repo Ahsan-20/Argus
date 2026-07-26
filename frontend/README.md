@@ -187,12 +187,17 @@ The background layer uses `contain: strict`, animates only `transform` and
 `opacity`, promotes a single element rather than each star, halves the star count
 on phones, and pauses entirely when the tab is hidden.
 
-The page transition overlay in
-[`src/components/RouteLoader.jsx`](src/components/RouteLoader.jsx) has no
-artificial minimum. It counts only queries that have no data yet, so a
-navigation whose data is already cached shows nothing at all, and a background
-refresh of a page you are already looking at cannot make a loading spinner
-appear over it.
+**Loading is shown in place, never over the page.** There is no full screen
+transition overlay. Each page either says so where the data will appear, as the
+watcher list and the watcher detail do, or renders without it and fills the
+value in when it lands, as the landing page and settings do with their counts.
+
+An overlay was tried first and removed. It could only ask whether a request was
+still in flight, never whether the page already had something on screen, so on
+any page that paints before all of its data arrives it appeared a moment later
+and covered content that was already there. Timing thresholds narrowed the
+window without closing it. A page knows what it is showing; a global overlay
+can only guess.
 
 ### Writing
 
