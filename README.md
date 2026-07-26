@@ -651,8 +651,6 @@ Deeper technical documentation lives with the code:
   SSRF, accounts and security, API reference, configuration
 - **[frontend/README.md](frontend/README.md)**: routes and guards, the data and
   session layer, design tokens, mobile rules
-- **[docs/engineering-log.md](docs/engineering-log.md)**: the day by day build
-  log, kept as it was written, including the dead ends
 
 ### Engineering worth pointing at
 
@@ -846,7 +844,6 @@ argus/
 │   └── README.md         frontend technical documentation
 └── docs/
     ├── screenshots/      the images used above
-    ├── engineering-log.md   the day by day build log
     ├── architecture-*.svg   the overview diagram, light and dark
     └── build_overview.py    the script that draws it
 ```
