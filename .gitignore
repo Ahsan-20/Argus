@@ -24,3 +24,9 @@ frontend/.vite/
 .idea/
 .DS_Store
 Thumbs.db
+
+# ---- Local tooling ----
+# Draws docs/architecture-*.svg. Kept out of the repo because the diagrams it
+# produces are committed, so nobody cloning this needs to run it.
+docs/build_overview.py
+docs/icons.json

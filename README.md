@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="backend/assets/logo_tile.png" alt="Argus" width="104">
+
 # Argus
 
 **Tell it what you are waiting for. It watches the page and emails you when it happens.**
@@ -844,8 +846,7 @@ argus/
 │   └── README.md         frontend technical documentation
 └── docs/
     ├── screenshots/      the images used above
-    ├── architecture-*.svg   the overview diagram, light and dark
-    └── build_overview.py    the script that draws it
+    └── architecture-*.svg   the overview diagram, light and dark
 ```
 
 ---
