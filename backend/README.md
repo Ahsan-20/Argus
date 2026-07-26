@@ -37,7 +37,7 @@ flowchart TB
     DB[("Postgres")]
     SITES["Target websites"]
     MODELS["Gemini, then Groq"]
-    MAIL["SMTP"]
+    MAIL["Apps Script relay,<br/>then Gmail"]
 
     BROWSER -- "Bearer token" --> ACCOUNTS
     BROWSER -- "Bearer token" --> WATCHERS
@@ -64,6 +64,7 @@ flowchart TB
 | `routers/watchers.py` | 564 | Watcher endpoints, ownership rules, caps |
 | `fetcher.py` | 491 | robots.txt, throttling, SSRF guards, text extraction |
 | `email_templates.py` | 451 | HTML emails for alerts and account mail |
+| `mailer.py` | 259 | Transport chain: Apps Script relay, Brevo, SMTP |
 | `routers/accounts.py` | 353 | Signup, signin, verification, password reset |
 | `demo.py` | 319 | Starter watchers, first account, demo target page |
 | `prompts.py` | 271 | The three system prompts and their JSON schemas |

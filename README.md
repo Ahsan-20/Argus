@@ -608,7 +608,8 @@ flowchart TB
     DB[("Supabase<br/>Postgres")]
     SITES["Target websites"]
     AI["Gemini,<br/>then Groq"]
-    MAIL["Gmail<br/>via Apps Script relay"]
+    RELAY["Apps Script relay<br/>HTTPS, because Render<br/>blocks SMTP"]
+    MAIL["Gmail<br/>sends the alert"]
 
     USER --> FE
     FE -- "Bearer token" --> API
@@ -618,7 +619,8 @@ flowchart TB
     TICK --> DB
     TICK --> SITES
     TICK --> AI
-    TICK --> MAIL
+    TICK --> RELAY
+    RELAY --> MAIL
     MAIL -- "alert" --> USER
 ```
 
@@ -650,6 +652,30 @@ list truncated at 32,000 characters simply does not contain the row you are
 looking for. The text sent for judging is assembled from the opening of the page
 plus windows around the rarest words of your condition, so that page becomes
 8,576 characters that *do* contain the relevant row.
+
+**Getting alerts out of a host that blocks email.** Argus is a notifier, so a
+deployment that cannot send is a deployment that does not work. Render's free
+tier blocks outbound SMTP on ports 25, 465 and 587, and a blocked port does not
+refuse the connection, it swallows it: the symptom was not an error but a signup
+request that never returned, measured at a 20 second timeout on both ports.
+
+The obvious fix, a third-party mail API over HTTPS, trades one problem for
+another. It gets past the port block, but mail from Brevo or SendGrid claiming
+to be from a Gmail address fails SPF and DKIM alignment, so it tends to land in
+spam. That is useless for a confirmation link somebody is waiting on.
+
+What works is a small Google Apps Script deployed as a web app. The backend
+reaches it over ordinary HTTPS, which no host blocks, and because the script
+runs inside the Google account that owns the mailbox, **Gmail itself does the
+sending**, so the mail authenticates exactly as it would over SMTP. It needs no
+cloud project and no card. Transports are tried in order and fall through on
+failure, so running Argus on a host that permits SMTP simply uses SMTP.
+
+Two details the client had to get right: an Apps Script web app answers with a
+302 and serves the result from a second domain, so redirects must be followed or
+every send looks like a failure while having quietly succeeded; and it reports
+its own errors as HTTP 200 with `ok: false`, so the body has to be read rather
+than the status line trusted.
 
 **No duplicate alerts.** Firing is an atomic `UPDATE ... WHERE status='active'`.
 Two concurrent passes cannot both win it, so a watcher cannot email you twice for
