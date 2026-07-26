@@ -78,19 +78,58 @@ def send_alert(
             _LOGO_BYTES, maintype="image", subtype="png", cid=LOGO_CID
         )
 
-    # Preference order, and why. The Apps Script relay is best: it is reached
-    # over HTTPS so no host blocks it, and Gmail itself does the sending, so
-    # the mail authenticates and reaches inboxes. Brevo also avoids the port
-    # block but sends on our behalf, which fails SPF and DKIM alignment for a
-    # @gmail.com sender and invites the spam folder. Plain SMTP authenticates
-    # properly but many hosts block the ports outright.
+    used = _deliver(msg, recipient, subject, body, html)
+    return {
+        "sent": True,
+        "to": recipient,
+        "subject": subject,
+        "body": body,
+        "via": used,
+    }
+
+
+def _deliver(msg: EmailMessage, to: str, subject: str, body: str, html: str | None) -> str:
+    """Try each configured transport in turn, and return the one that worked.
+
+    Order, and the reasoning. The Apps Script relay is best: it is reached over
+    HTTPS so no host blocks it, and Gmail itself does the sending, so the mail
+    authenticates and reaches inboxes. Brevo also avoids the port block but
+    sends on our behalf, which fails SPF and DKIM alignment for a @gmail.com
+    sender and invites the spam folder. Plain SMTP authenticates properly but
+    many hosts block the ports outright.
+
+    Genuinely falling through on failure, not just picking one and hoping. A
+    relay can be deleted, hit its daily quota, or be down, and on a host where
+    SMTP does work it is better to be slow than silent. Every attempt is
+    bounded by its own timeout and sending happens after the response, so
+    nobody is left waiting on the retries.
+
+    Only configured transports are attempted, so this changes nothing for a
+    deployment that has set up exactly one.
+    """
+    attempts: list[tuple[str, object]] = []
     if settings.apps_script_mail_enabled:
-        _send_apps_script(recipient, subject, body, html)
-    elif settings.brevo_api_key:
-        _send_http(recipient, subject, body, html)
-    else:
-        _send(msg)
-    return {"sent": True, "to": recipient, "subject": subject, "body": body}
+        attempts.append(("apps-script", lambda: _send_apps_script(to, subject, body, html)))
+    if settings.brevo_api_key:
+        attempts.append(("brevo", lambda: _send_http(to, subject, body, html)))
+    if settings.smtp_user and settings.smtp_password:
+        attempts.append(("smtp", lambda: _send(msg)))
+
+    if not attempts:
+        raise RuntimeError("no email transport is configured")
+
+    last: Exception | None = None
+    for name, send in attempts:
+        try:
+            send()
+            if last is not None:
+                logger.info("mail sent via %s after an earlier transport failed", name)
+            return name
+        except Exception as exc:
+            last = exc
+            logger.warning("mail transport %s failed: %s", name, str(exc)[:200])
+
+    raise last
 
 
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
@@ -185,13 +224,18 @@ def _send_http(to: str, subject: str, body: str, html: str | None) -> None:
         raise RuntimeError(f"mail API returned {resp.status_code}")
 
 
-# Without this, smtplib inherits the global default socket timeout, which is
-# None, meaning wait forever. Hosting providers routinely block outbound SMTP
+# Deliberately short. Without any timeout smtplib inherits the global default of
+# None and waits forever, but a long one is nearly as bad: where the port is
+# blocked the connection is swallowed rather than refused, so the full timeout
+# is spent every single time, and this transport sits at the end of a fallback
+# chain that only reaches it after something else has already failed. A healthy
+# SMTP server answers in under two seconds, so eight is generous for the case
+# that works and cheap for the case that never will. Hosting providers routinely block outbound SMTP
 # to stop their address ranges being used for spam, and a blocked port does not
 # refuse the connection, it swallows it. The result is a request that never
 # returns rather than an error anyone can see or handle: signing up hung
 # indefinitely on a deployment where everything else worked.
-SMTP_TIMEOUT = 20
+SMTP_TIMEOUT = 8
 
 
 def _send(msg: EmailMessage) -> None:
