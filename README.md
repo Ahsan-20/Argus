@@ -590,6 +590,18 @@ physically cannot return a shape the rest of the code does not expect.
 
 ## How it is put together
 
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture-dark.svg">
+  <img alt="Argus architecture: the browser talks to the API, which reads target pages, judges them with Gemini, stores everything in Postgres, and sends the alert out through a mail relay to your inbox" src="docs/architecture-light.svg" width="100%">
+</picture>
+
+</div>
+
+The same system with every path drawn in, including the ones that only matter
+when something goes wrong:
+
 ```mermaid
 flowchart TB
     USER["Browser"]
@@ -827,7 +839,10 @@ argus/
 │   │   └── lib/              API client, formatting
 │   ├── vercel.json
 │   └── README.md         frontend technical documentation
-└── docs/screenshots/     the images used above
+└── docs/
+    ├── screenshots/      the images used above
+    ├── architecture-*.svg   the overview diagram, light and dark
+    └── build_overview.py    the script that draws it
 ```
 
 ---

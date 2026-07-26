@@ -88,7 +88,7 @@ sequenceDiagram
     participant DB as Postgres
     participant P as Target page
     participant AI as Gemini
-    participant M as SMTP
+    participant M as Mail relay
 
     S->>DB: claim watchers whose next_run_at has passed
     DB-->>S: claimed ids, atomic with SKIP LOCKED
@@ -108,7 +108,7 @@ sequenceDiagram
             S->>DB: atomic claim, active to triggered
             S->>AI: write the alert
             AI-->>S: subject and body
-            S->>M: send the email
+            S->>M: send the email, Gmail delivers it
             S->>DB: store a copy of what was sent
         end
 
