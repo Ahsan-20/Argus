@@ -596,7 +596,7 @@ physically cannot return a shape the rest of the code does not expect.
 | **Supabase** | Postgres |
 | **Google AI Studio** | Gemini API |
 | **Groq** | Fallback inference |
-| **Gmail**, via an Apps Script relay | Email delivery over HTTPS, because the host blocks SMTP. Gmail still does the sending, so alerts authenticate and reach inboxes. See [Known limits](#known-limits) |
+| **Gmail**, via an Apps Script relay | Email delivery over HTTPS, because the host blocks SMTP. Gmail still does the sending, so alerts authenticate and reach inboxes. See [Engineering worth pointing at](#engineering-worth-pointing-at) |
 | **UptimeRobot** | Probes `/health` every 5 minutes, which both keeps the free instance awake and reports real downtime |
 | **r.jina.ai** | Renders JavaScript-dependent pages when a plain read finds nothing |
 
@@ -866,17 +866,3 @@ Stated plainly, because a tool you cannot trust the boundaries of is not useful.
 - **Confidence is the model's own estimate**, not a calibrated probability. This
   is why an alert is never sent below 70 regardless of what the number says.
 - **Free tier limits**: 5 watchers per account, 25 running across the deployment.
-- **Email needs a transport the host permits.** The free host blocks outbound
-  SMTP on ports 25, 465 and 587, which is a standard measure to stop hosting
-  ranges being used for spam. Argus therefore sends through a small Google Apps
-  Script relay instead: the backend reaches it over ordinary HTTPS, which no
-  host blocks, and because the script runs inside the Google account that owns
-  the mailbox, Gmail itself does the sending. That second part matters. A
-  third-party mail service would also get past the port block, but mail from it
-  claiming to be a Gmail address fails SPF and DKIM alignment and tends to land
-  in spam, which is no use for a confirmation link somebody is waiting on.
-
-  Transports are tried in order and fall through on failure, so a deployment on
-  a host that permits SMTP simply uses it. **Every alert is also stored and shown
-  in the app** on the watcher's own page, because an inbox is not a reliable
-  place to keep something.
