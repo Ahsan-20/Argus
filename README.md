@@ -23,12 +23,8 @@ thing you are waiting for has happened, and tells you the moment it has.
 | **Repository** | https://github.com/Ahsan-20/Argus |
 
 You can create an account and use it straight away. There is no inbox detour
-first: a new account works for 24 hours before it needs confirming.
-
-One honest caveat about the hosted instance: the free host blocks outbound SMTP,
-so email does not leave it. Nothing here depends on that. Every alert is written
-and stored and shown on the watcher's own page, which is where this walkthrough
-points anyway. See [Known limits](#known-limits).
+first: a new account works for 24 hours before it needs confirming, though the
+confirmation email will be waiting for you.
 
 There are also **six shared watchers** on real websites in the *Shared* tab.
 Copy one into your own account with a single tap to see a working watcher without
@@ -586,7 +582,7 @@ physically cannot return a shape the rest of the code does not expect.
 | **Supabase** | Postgres |
 | **Google AI Studio** | Gemini API |
 | **Groq** | Fallback inference |
-| **Gmail SMTP** | Email delivery. An HTTP transport is also implemented, for hosts that block outbound SMTP. See [Known limits](#known-limits) |
+| **Gmail**, via an Apps Script relay | Email delivery over HTTPS, because the host blocks SMTP. Gmail still does the sending, so alerts authenticate and reach inboxes. See [Known limits](#known-limits) |
 | **UptimeRobot** | Probes `/health` every 5 minutes, which both keeps the free instance awake and reports real downtime |
 | **r.jina.ai** | Renders JavaScript-dependent pages when a plain read finds nothing |
 
@@ -612,7 +608,7 @@ flowchart TB
     DB[("Supabase<br/>Postgres")]
     SITES["Target websites"]
     AI["Gemini,<br/>then Groq"]
-    MAIL["Gmail SMTP"]
+    MAIL["Gmail<br/>via Apps Script relay"]
 
     USER --> FE
     FE -- "Bearer token" --> API
@@ -825,16 +821,17 @@ Stated plainly, because a tool you cannot trust the boundaries of is not useful.
 - **Confidence is the model's own estimate**, not a calibrated probability. This
   is why an alert is never sent below 70 regardless of what the number says.
 - **Free tier limits**: 5 watchers per account, 25 running across the deployment.
-- **The deployed instance cannot send email.** The host blocks outbound SMTP on
-  both port 587 and port 465, measured at a 20 second timeout every time, which
-  is a standard measure to stop hosting ranges being used for spam. Email works
-  when Argus is run anywhere without that restriction, including locally, and
-  the delivery code is complete either way. A second transport that sends over
-  an HTTP API on port 443 is implemented and enabled by a single environment
-  variable, waiting on the provider account being activated.
+- **Email needs a transport the host permits.** The free host blocks outbound
+  SMTP on ports 25, 465 and 587, which is a standard measure to stop hosting
+  ranges being used for spam. Argus therefore sends through a small Google Apps
+  Script relay instead: the backend reaches it over ordinary HTTPS, which no
+  host blocks, and because the script runs inside the Google account that owns
+  the mailbox, Gmail itself does the sending. That second part matters. A
+  third-party mail service would also get past the port block, but mail from it
+  claiming to be a Gmail address fails SPF and DKIM alignment and tends to land
+  in spam, which is no use for a confirmation link somebody is waiting on.
 
-  Nothing depends on email to use the app. A new account works for 24 hours
-  before it needs confirming, and **every alert is stored and shown in the app**
-  on the watcher's own page, exactly as it was written. That was built because
-  an inbox is not a reliable place to keep something, and it turns out to cover
-  this too.
+  Transports are tried in order and fall through on failure, so a deployment on
+  a host that permits SMTP simply uses it. **Every alert is also stored and shown
+  in the app** on the watcher's own page, because an inbox is not a reliable
+  place to keep something.
