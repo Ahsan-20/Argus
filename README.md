@@ -9,29 +9,28 @@
 An AI agent that reads web pages the way a person would, judges whether the
 thing you are waiting for has happened, and tells you the moment it has.
 
-[Live app](#live-app) · [The problem](#the-problem) · [Features](#features) ·
+[Try it](#try-it) · [The problem](#the-problem) · [Features](#features) ·
 [The AI](#the-ai-feature) · [Screenshots](#screenshots) · [Run it](#running-the-project)
 
 </div>
 
 ---
 
-## Live app
+## Try it
 
-| | |
-|---|---|
-| **App** | **https://argus-one-hazel.vercel.app** |
-| **API** | https://argus-xv4m.onrender.com |
-| **Repository** | https://github.com/Ahsan-20/Argus |
+Argus was deployed on Vercel and Render for the ACT AI programme. That hosted
+demo is no longer maintained, so it may be offline. The code is complete and
+runs locally in a few minutes with a free Postgres database and a free Gemini
+key: see [Running the project](#running-the-project). The screenshots further
+down show it in use.
 
-You can create an account and use it straight away. There is no inbox detour
-first: a new account works for 24 hours before it needs confirming, though the
-confirmation email will be waiting for you.
+Once it is running, you can create an account and use it straight away. There
+is no inbox detour first: a new account works for 24 hours before it needs
+confirming.
 
-There are also **six ready made watchers** on real websites in the *Shared* tab,
-alongside any that other people have shared.
-Copy one into your own account with a single tap to see a working watcher without
-writing anything.
+It also comes with **six ready made watchers** on real websites in the *Shared*
+tab. Copy one into your own account with a single tap to see a working watcher
+without writing anything.
 
 ---
 
@@ -92,7 +91,7 @@ and the tracked value, so nothing has to be taken on trust.
 
 ### The dollar example, as it actually runs
 
-This is one of the six ready made watchers, live in the app right now:
+This is one of the six ready made watchers, as it ran on the hosted deployment:
 
 | | |
 |---|---|

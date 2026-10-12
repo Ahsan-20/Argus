@@ -3,11 +3,11 @@
 The React client for Argus. A single-page app for creating watchers, following
 what they find, and managing your account.
 
-**Live:** https://argus-one-hazel.vercel.app
+It was deployed on Vercel for the ACT AI programme. That deployment is no longer
+maintained, so to try it, run it locally as described below.
 
-The API it talks to is in [`../backend`](../backend), deployed at
-https://argus-xv4m.onrender.com. The project overview and screenshots are in the
-[root README](../README.md).
+The API it talks to is in [`../backend`](../backend). The project overview and
+screenshots are in the [root README](../README.md).
 
 **Stack:** React 19, Vite 8, React Router 7, TanStack Query 5, Tailwind CSS 4,
 framer-motion. Plain JavaScript with JSX, no TypeScript. All charts and diagrams

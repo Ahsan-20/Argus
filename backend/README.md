@@ -4,7 +4,8 @@ The FastAPI service behind Argus. It stores the watchers, keeps their schedule,
 fetches the pages, asks the AI whether the thing you were waiting for has
 happened, and sends the email when it has.
 
-**Live:** https://argus-xv4m.onrender.com
+It was deployed on Render for the ACT AI programme. That deployment is no longer
+maintained, so to try it, run it locally as described below.
 
 The React client is in [`../frontend`](../frontend). The project overview,
 screenshots and the full system prompts are in the
